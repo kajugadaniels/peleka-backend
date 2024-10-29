@@ -219,39 +219,17 @@ class RiderListCreateView(generics.ListCreateAPIView):
             raise PermissionDenied({'message': "You do not have permission to view this resource."})
         return super().get_queryset()
 
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        response.data = {'message': "Riders retrieved successfully", 'data': response.data}
+        return response
+
     def post(self, request, *args, **kwargs):
         # Ensure user has 'add_rider' permission to create a new Rider
         if not request.user.is_superuser and not request.user.has_perm('system.add_rider'):
             raise PermissionDenied({'message': "You do not have permission to add this resource."})
         
-        return self.create(request, *args, **kwargs)
+        response = self.create(request, *args, **kwargs)
+        response.data = {'message': "Rider created successfully", 'data': response.data}
+        return response
 
-class RiderRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    API view to retrieve, update, or delete a Rider.
-    - Only accessible to users with 'view_rider', 'change_rider', or 'delete_rider' permissions.
-    """
-    queryset = Rider.objects.all()
-    serializer_class = RiderSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, *args, **kwargs):
-        # Ensure user has 'view_rider' permission to retrieve Rider details
-        if not request.user.is_superuser and not request.user.has_perm('system.view_rider'):
-            raise PermissionDenied({'message': "You do not have permission to view this resource."})
-        
-        return self.retrieve(request, *args, **kwargs)
-
-    def put(self, request, *args, **kwargs):
-        # Ensure user has 'change_rider' permission to update Rider details
-        if not request.user.is_superuser and not request.user.has_perm('system.change_rider'):
-            raise PermissionDenied({'message': "You do not have permission to edit this resource."})
-        
-        return self.update(request, *args, **kwargs)
-
-    def delete(self, request, *args, **kwargs):
-        # Ensure user has 'delete_rider' permission to delete a Rider
-        if not request.user.is_superuser and not request.user.has_perm('system.delete_rider'):
-            raise PermissionDenied({'message': "You do not have permission to delete this resource."})
-        
-        return self.destroy(request, *args, **kwargs)
