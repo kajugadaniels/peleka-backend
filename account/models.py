@@ -4,7 +4,13 @@ from django.db import models
 from account.managers import *
 from django.utils import timezone
 from django.utils.text import slugify
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+
+class Role(models.Model):
+    name = models.CharField(max_length=100, null=True, blank=True)
+
+    def __str__(self):
+        return self.name or "Unnamed Role"
 
 class User(AbstractBaseUser, PermissionsMixin):
     STATUS_CHOICE = [
