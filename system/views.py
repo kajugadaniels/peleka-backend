@@ -1,3 +1,5 @@
+from system.models import *
+from system.serializers import *
 from account.serializers import *
 from django.db import transaction
 from django.db.models import Count, Q
@@ -201,3 +203,26 @@ class UserDetailView(APIView):
 
         user.delete()
         return Response({"message": "User deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+
+class RiderListCreateView(generics.ListCreateAPIView):
+    """
+    API view to list all Riders and allow creation of new Riders.
+    - Only accessible to users with 'view_rider' or 'add_rider' permissions.
+    """
+    queryset = Rider.objects.all()
+    serializer_class = RiderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Ensure user has 'view_rider' permission to list Riders
+        if not self.request.user.is_superuser and not self.request.user.has_perm('system.view_rider'):
+            raise PermissionDenied({'message': "You do not have permission to view this resource."})
+        return super().get_queryset()
+
+    def post(self, request, *args, **kwargs):
+        # Ensure user has 'add_rider' permission to create a new Rider
+        if not request.user.is_superuser and not request.user.has_perm('system.add_rider'):
+            raise PermissionDenied({'message': "You do not have permission to add this resource."})
+        
+        return self.create(request, *args, **kwargs)
+
