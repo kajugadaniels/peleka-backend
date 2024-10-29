@@ -30,26 +30,26 @@ class PermissionListView(generics.ListAPIView):
 
 class AssignPermissionView(APIView):
     """
-    View to assign multiple permissions to a user. Handles cases where the user already has the permission and ensures only authorized users can assign permissions.
+    API view to assign permissions to a user. Only superusers or users with 'change_user' permission can access.
     """
-    # Restrict this API to only those who can manage user permissions
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAdminUser]  # Restricted to admin users
 
     def post(self, request, *args, **kwargs):
-        if not request.user.is_superuser:
-            # Check if the user has the permission to assign permissions
-            if not request.user.has_perm('auth.change_user'):
-                raise PermissionDenied({'message': "You do not have permission to assign permissions."})
+        # Superusers can bypass the permission check
+        if not request.user.is_superuser and not request.user.has_perm('auth.change_user'):
+            raise PermissionDenied({'message': "You do not have permission to assign permissions."})
 
         user_id = request.data.get('user_id')
         permission_codenames = request.data.get('permission_codename', [])
         response_data = []
 
+        # Check if user exists
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({'message': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+        # Assign each permission if the user doesn't already have it
         for codename in permission_codenames:
             try:
                 permission = Permission.objects.get(codename=codename)
@@ -61,8 +61,6 @@ class AssignPermissionView(APIView):
             except Permission.DoesNotExist:
                 response_data.append({'codename': codename, 'status': 'Permission not found.'})
 
-        if any(item['status'].startswith('User already has') for item in response_data):
-            return Response({'results': response_data}, status=status.HTTP_409_CONFLICT)
         return Response({'results': response_data}, status=status.HTTP_200_OK)
 
 class RemovePermissionView(APIView):
