@@ -151,7 +151,8 @@ class UserListView(APIView):
 
 class UserDetailView(APIView):
     """
-    API view to retrieve, update, or delete user details by ID. Restricted to superusers or the user themselves.
+    API view to retrieve, update, or delete user details by ID.
+    Accessible only to superusers or users with specific permissions for each action.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -166,6 +167,11 @@ class UserDetailView(APIView):
         user = self.get_object(user_id)
         if user is None:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Only superusers or users with 'view_user' permission can view user details
+        if not request.user.is_superuser and not request.user.has_perm('account.view_user'):
+            return Response({"error": "You do not have permission to view this user."}, status=status.HTTP_403_FORBIDDEN)
+
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -174,8 +180,8 @@ class UserDetailView(APIView):
         if user is None:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Only superusers or the user themselves can update
-        if not request.user.is_superuser and request.user.id != user.id:
+        # Only superusers or users with 'change_user' permission can update user details
+        if not request.user.is_superuser and not request.user.has_perm('account.change_user'):
             return Response({"error": "You do not have permission to edit this user."}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = UserSerializer(user, data=request.data)
@@ -189,8 +195,8 @@ class UserDetailView(APIView):
         if user is None:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Only superusers can delete users
-        if not request.user.is_superuser:
+        # Only superusers or users with 'delete_user' permission can delete users
+        if not request.user.is_superuser and not request.user.has_perm('account.delete_user'):
             return Response({"error": "You do not have permission to delete this user."}, status=status.HTTP_403_FORBIDDEN)
 
         user.delete()
