@@ -13,21 +13,43 @@ class PermissionSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     user_permissions = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = (
             'id', 'name', 'email', 'phone_number', 'role', 'password', 'user_permissions'
         )
+        extra_kwargs = {
+            'password': {'write_only': True}  # Password should be write-only for security
+        }
 
     def get_user_permissions(self, obj):
         """Retrieve the user's direct permissions."""
         return obj.get_all_permissions()
 
     def create(self, validated_data):
+        """
+        Create a new user with a hashed password.
+        """
         password = validated_data.pop('password', None)
         user = User.objects.create_user(**validated_data)
         if password:
             user.set_password(password)
         user.save()
-
         return user
+
+    def update(self, instance, validated_data):
+        """
+        Update user details and hash the password if provided.
+        """
+        # If a password is provided, hash it using set_password
+        password = validated_data.pop('password', None)
+        if password:
+            instance.set_password(password)  # Hash and set the new password
+
+        # Update the remaining fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+        return instance
