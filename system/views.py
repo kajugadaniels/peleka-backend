@@ -11,18 +11,18 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 
 class PermissionListView(generics.ListAPIView):
     """
-    View to list all permissions. Accessible only to users with appropriate permissions or superusers.
+    View to list all permissions. Accessible only to superusers or users with the 'view_permission' permission.
     """
     queryset = Permission.objects.all()
     serializer_class = PermissionSerializer
-    permission_classes = [permissions.IsAuthenticated] # Change to ensure only authenticated users can access
+    permission_classes = [permissions.IsAuthenticated]  # Access restricted to authenticated users
 
     def get_queryset(self):
-        # Allow superusers unrestricted access
+        # Superusers can access all permissions
         if self.request.user.is_superuser:
             return super().get_queryset()
 
-        # Check if the user has the 'view_permission' permission
+        # Users require 'auth.view_permission' permission to access this endpoint
         if not self.request.user.has_perm('auth.view_permission'):
             raise PermissionDenied({'message': "You do not have permission to view permissions."})
 
