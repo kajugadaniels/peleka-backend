@@ -148,11 +148,12 @@ class UserListView(APIView):
 
 class UserDetailView(APIView):
     """
-    API view to retrieve, update, or delete a user's details by their ID.
+    API view to retrieve, update, or delete user details by ID. Restricted to superusers or the user themselves.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self, user_id):
+        # Retrieve user or return None if not found
         try:
             return User.objects.get(id=user_id)
         except User.DoesNotExist:
@@ -170,7 +171,7 @@ class UserDetailView(APIView):
         if user is None:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Permission check: Only superusers or the user themselves can update
+        # Only superusers or the user themselves can update
         if not request.user.is_superuser and request.user.id != user.id:
             return Response({"error": "You do not have permission to edit this user."}, status=status.HTTP_403_FORBIDDEN)
 
@@ -185,10 +186,9 @@ class UserDetailView(APIView):
         if user is None:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Permission check: Only superusers or users with specific permission can delete
+        # Only superusers can delete users
         if not request.user.is_superuser:
             return Response({"error": "You do not have permission to delete this user."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Deleting the user
         user.delete()
         return Response({"message": "User deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
