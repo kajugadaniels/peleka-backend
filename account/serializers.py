@@ -11,6 +11,11 @@ class PermissionSerializer(serializers.ModelSerializer):
         model = Permission
         fields = ('id', 'name', 'codename', 'content_type')
 
+class RoleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Role
+        fields = ('id', 'name')
+
 class UserSerializer(serializers.ModelSerializer):
     user_permissions = serializers.SerializerMethodField()
 
