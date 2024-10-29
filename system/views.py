@@ -65,26 +65,25 @@ class AssignPermissionView(APIView):
 
 class RemovePermissionView(APIView):
     """
-    View to remove permissions from a user.
+    API view to remove permissions from a user. Only superusers or users with 'change_user' permission can access.
     """
-    permission_classes = [permissions.IsAdminUser]  # Only admins can access this
+    permission_classes = [permissions.IsAdminUser]  # Restricted to admin users
 
     def post(self, request, *args, **kwargs):
-        # Superusers bypass all permissions checks
-        if not request.user.is_superuser:
-            # Verify the user has permission to change user permissions
-            if not request.user.has_perm('auth.change_user'):
-                raise PermissionDenied({'message': "You do not have permission to remove permissions."})
+        if not request.user.is_superuser and not request.user.has_perm('auth.change_user'):
+            raise PermissionDenied({'message': "You do not have permission to remove permissions."})
 
         user_id = request.data.get('user_id')
         permissions_codenames = request.data.get('permission_codename', [])
         results = []
 
+        # Check if user exists
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({'message': "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Remove each permission if the user has it
         for codename in permissions_codenames:
             try:
                 permission = Permission.objects.get(codename=codename)
