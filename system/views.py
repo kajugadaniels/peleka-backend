@@ -137,3 +137,26 @@ class UserPermissionsView(APIView):
                 'message': 'Failed to retrieve permissions.',
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class UserListView(APIView):
+    """
+    API view to list all users with their roles.
+    Only superusers and users with the 'Admin' role can view users.
+    """
+    permission_classes = [IsAuthenticated]  # Allow access to authenticated users
+
+    def get(self, request):
+        try:
+            # Check if the user is a superuser or has the role of 'Admin'
+            if request.user.is_superuser:
+                users = User.objects.all().order_by('-id')
+            else:
+                # If the user is not authorized, return a forbidden response
+                return Response({"error": "You do not have permission to view this resource."},
+                                status=status.HTTP_403_FORBIDDEN)
+
+            # Serialize user data with roles
+            serializer = UserSerializer(users, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
