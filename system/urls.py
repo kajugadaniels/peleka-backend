@@ -11,6 +11,9 @@ urlpatterns = [
     path('remove-permission/', RemovePermissionView.as_view(), name='removePermission'),
     path('permissions/<int:user_id>/', UserPermissionsView.as_view(), name='userPermissions'),
 
-    path('users/', UserListView.as_view(), name='getUsers'),
-    path('user/<int:user_id>/', UserDetailView.as_view(), name='userDetail'),
+    path('users/', UserListView.as_view(), name='UserList'),
+    path('user/<int:user_id>/', UserDetailView.as_view(), name='UserDetail'),
+
+    path('riders/', RiderListCreateView.as_view(), name='RiderListCreate'),
+    path('riders/<int:pk>/', RiderRetrieveUpdateDeleteView.as_view(), name='RiderRetrieveUpdateDelete'),
 ]  + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
