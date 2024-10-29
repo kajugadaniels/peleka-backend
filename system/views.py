@@ -129,16 +129,19 @@ class UserPermissionsView(APIView):
 
 class UserListView(APIView):
     """
-    API view to list all users and their roles. Accessible only to superusers or users with 'Admin' role.
+    API view to list all users and their roles. Accessible only to superusers or users with 'view_user' permission.
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Allow superusers to view all users
+        # Superusers can access all users
         if request.user.is_superuser:
             users = User.objects.all().order_by('-id')
+        elif request.user.has_perm('account.view_user'):
+            # Users with the 'view_user' permission can access all users
+            users = User.objects.all().order_by('-id')
         else:
-            # Unauthorized users receive a forbidden response
+            # If the user lacks the necessary permission, return a forbidden response
             return Response({"error": "You do not have permission to view this resource."},
                             status=status.HTTP_403_FORBIDDEN)
 
