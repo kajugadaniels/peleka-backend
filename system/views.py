@@ -233,3 +233,38 @@ class RiderListCreateView(generics.ListCreateAPIView):
         response.data = {'message': "Rider created successfully", 'data': response.data}
         return response
 
+class RiderRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    API view to retrieve, update, or delete a Rider.
+    - Only accessible to users with 'view_rider', 'change_rider', or 'delete_rider' permissions.
+    """
+    queryset = Rider.objects.all()
+    serializer_class = RiderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        # Ensure user has 'view_rider' permission to retrieve Rider details
+        if not request.user.is_superuser and not request.user.has_perm('system.view_rider'):
+            raise PermissionDenied({'message': "You do not have permission to view this resource."})
+        
+        response = self.retrieve(request, *args, **kwargs)
+        response.data = {'message': "Rider details retrieved successfully", 'data': response.data}
+        return response
+
+    def put(self, request, *args, **kwargs):
+        # Ensure user has 'change_rider' permission to update Rider details
+        if not request.user.is_superuser and not request.user.has_perm('system.change_rider'):
+            raise PermissionDenied({'message': "You do not have permission to edit this resource."})
+        
+        response = self.update(request, *args, **kwargs)
+        response.data = {'message': "Rider updated successfully", 'data': response.data}
+        return response
+
+    def delete(self, request, *args, **kwargs):
+        # Ensure user has 'delete_rider' permission to delete a Rider
+        if not request.user.is_superuser and not request.user.has_perm('system.delete_rider'):
+            raise PermissionDenied({'message': "You do not have permission to delete this resource."})
+        
+        response = self.destroy(request, *args, **kwargs)
+        response.data = {'message': "Rider deleted successfully"}
+        return response
