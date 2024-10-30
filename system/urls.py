@@ -7,7 +7,7 @@ app_name = 'system'
 
 urlpatterns = [
     path('roles/', RoleListCreateView.as_view(), name='RoleListCreate'),
-    path('roles/<int:pk>/', RoleRetrieveUpdateDeleteView.as_view(), name='RoleRetrieveUpdateDelete'),
+    path('roles/<int:pk>/', RoleRetrieveUpdateDestroyView.as_view(), name='RoleRetrieveUpdateDelete'),
 
     path('permissions/', PermissionListView.as_view(), name='permissionList'),
     path('assign-permission/', AssignPermissionView.as_view(), name='assignPermission'),
