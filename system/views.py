@@ -11,6 +11,35 @@ from django.core.exceptions import PermissionDenied
 from rest_framework import generics, permissions, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 
+class RoleListCreateView(generics.ListCreateAPIView):
+    """
+    API view to list all Roles and allow creation of new Roles.
+    Accessible only to users with 'view_role' or 'add_role' permissions.
+    """
+    queryset = Role.objects.all()
+    serializer_class = RoleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Ensure user has 'view_role' permission to list Roles
+        if not self.request.user.is_superuser and not self.request.user.has_perm('account.view_role'):
+            raise PermissionDenied({'message': "You do not have permission to view roles."})
+        return super().get_queryset()
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        response.data = {'message': "Roles retrieved successfully.", 'data': response.data}
+        return response
+
+    def post(self, request, *args, **kwargs):
+        # Ensure user has 'add_role' permission to create a new Role
+        if not request.user.is_superuser and not request.user.has_perm('account.add_role'):
+            raise PermissionDenied({'message': "You do not have permission to add roles."})
+
+        response = self.create(request, *args, **kwargs)
+        response.data = {'message': "Role created successfully.", 'data': response.data}
+        return response
+
 class PermissionListView(generics.ListAPIView):
     """
     View to list all permissions. Accessible only to superusers or users with the 'view_permission' permission.
