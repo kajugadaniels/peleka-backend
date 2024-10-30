@@ -40,6 +40,42 @@ class RoleListCreateView(generics.ListCreateAPIView):
         response.data = {'message': "Role created successfully.", 'data': response.data}
         return response
 
+class RoleRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    API view to retrieve, update, or delete a Role.
+    Accessible only to users with 'view_role', 'change_role', or 'delete_role' permissions.
+    """
+    queryset = Role.objects.all()
+    serializer_class = RoleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        # Ensure user has 'view_role' permission to retrieve Role details
+        if not request.user.is_superuser and not request.user.has_perm('account.view_role'):
+            raise PermissionDenied({'message': "You do not have permission to view this role."})
+
+        response = self.retrieve(request, *args, **kwargs)
+        response.data = {'message': "Role details retrieved successfully.", 'data': response.data}
+        return response
+
+    def put(self, request, *args, **kwargs):
+        # Ensure user has 'change_role' permission to update Role details
+        if not request.user.is_superuser and not request.user.has_perm('account.change_role'):
+            raise PermissionDenied({'message': "You do not have permission to edit this role."})
+
+        response = self.update(request, *args, **kwargs)
+        response.data = {'message': "Role updated successfully.", 'data': response.data}
+        return response
+
+    def delete(self, request, *args, **kwargs):
+        # Ensure user has 'delete_role' permission to delete a Role
+        if not request.user.is_superuser and not request.user.has_perm('account.delete_role'):
+            raise PermissionDenied({'message': "You do not have permission to delete this role."})
+
+        response = self.destroy(request, *args, **kwargs)
+        response.data = {'message': "Role deleted successfully."}
+        return response
+
 class PermissionListView(generics.ListAPIView):
     """
     View to list all permissions. Accessible only to superusers or users with the 'view_permission' permission.
