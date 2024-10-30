@@ -17,12 +17,13 @@ class RoleSerializer(serializers.ModelSerializer):
         fields = ('id', 'name')
 
 class UserSerializer(serializers.ModelSerializer):
+    role_name = serializers.CharField(source='role.name', read_only=True)
     user_permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = (
-            'id', 'name', 'email', 'phone_number', 'role', 'password', 'user_permissions'
+            'id', 'name', 'email', 'phone_number', 'role', 'role_name', 'password', 'user_permissions'
         )
         extra_kwargs = {
             'password': {'write_only': True}  # Password should be write-only for security
