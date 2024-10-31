@@ -7,9 +7,19 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, required=True)
 
 class PermissionSerializer(serializers.ModelSerializer):
+    permission_string = serializers.SerializerMethodField()
+
     class Meta:
         model = Permission
-        fields = ('id', 'name', 'codename', 'content_type')
+        fields = ('permission_string',)
+
+    def get_permission_string(self, obj):
+        """
+        Return permission in 'app_label.codename' format.
+        """
+        app_label = obj.content_type.app_label
+        codename = obj.codename
+        return f"{app_label}.{codename}"
 
 class RoleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -30,20 +40,8 @@ class UserSerializer(serializers.ModelSerializer):
         }
 
     def get_user_permissions(self, obj):
-        """
-        Retrieve detailed information for the user's direct permissions.
-        """
-        permissions = obj.user_permissions.all()
-        detailed_permissions = [
-            {
-                'id': perm.id,
-                'name': perm.name,
-                'codename': perm.codename,
-                'content_type': perm.content_type.model
-            }
-            for perm in permissions
-        ]
-        return detailed_permissions
+        """Retrieve the user's direct permissions."""
+        return obj.get_all_permissions()
 
     def create(self, validated_data):
         """
