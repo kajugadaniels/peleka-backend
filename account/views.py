@@ -35,20 +35,13 @@ class LoginView(GenericAPIView):  # Change to GenericAPIView
 
 class RegisterView(generics.CreateAPIView):
     """
-    View to register a new user. Only accessible to users with the appropriate administrative permissions.
+    View to register a new user. Accessible to any user.
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    # Ensures only users with admin status can access this view
-    # permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.AllowAny]  # Allow any user to access this view
 
     def create(self, request, *args, **kwargs):
-        # Superusers bypass all permissions checks
-        if not request.user.is_superuser:
-            # Verify the user has permission to add a user
-            if not request.user.has_perm('auth.add_user'):
-                raise PermissionDenied({'message': "You do not have permission to perform this action."})
-
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             user = serializer.save()
