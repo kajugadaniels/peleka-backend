@@ -248,7 +248,7 @@ class UserDetailView(APIView):
     API view to retrieve, update, or delete user details by ID.
     Accessible only to superusers or users with specific permissions for each action.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get_object(self, user_id):
         # Retrieve user or return None if not found
