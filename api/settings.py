@@ -14,7 +14,7 @@ SECRET_KEY = 'django-insecure-7=@(fgl#)t5a-rdmoj3=#vp_=pc5(iyeuifxwc&kdqcer$ns()
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -163,7 +163,7 @@ REST_FRAMEWORK = {
     ],
 }
 
-# CSRF_TRUSTED_ORIGINS = ['','https://*.127.0.0.1']
+CSRF_TRUSTED_ORIGINS = ['https://peleka-api.up.railway.app','https://*.127.0.0.1']
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
