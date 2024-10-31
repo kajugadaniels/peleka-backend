@@ -6,6 +6,9 @@ from django.conf.urls.static import static
 app_name = 'system'
 
 urlpatterns = [
+    path('roles/', RoleListCreateView.as_view(), name='RoleListCreate'),
+    path('roles/<int:pk>/', RoleRetrieveUpdateDestroyView.as_view(), name='RoleRetrieveUpdateDelete'),
+
     path('permissions/', PermissionListView.as_view(), name='permissionList'),
     path('assign-permission/', AssignPermissionView.as_view(), name='assignPermission'),
     path('remove-permission/', RemovePermissionView.as_view(), name='removePermission'),

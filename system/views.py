@@ -7,9 +7,101 @@ from rest_framework.views import APIView
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
 from django.core.exceptions import PermissionDenied
 from rest_framework import generics, permissions, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
+
+class RoleListCreateView(generics.ListCreateAPIView):
+    """
+    API view to list all roles or create a new role. Ensures only users with appropriate permissions or superusers can access.
+    """
+    queryset = Role.objects.order_by('-id')
+    serializer_class = RoleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        # Superusers have unrestricted access
+        if not request.user.is_superuser:
+            # Check if the user has permission to view roles
+            if not request.user.has_perm('account.view_role'):
+                raise PermissionDenied({'message': "You do not have permission to view roles."})
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        # Superusers can perform any action
+        if not request.user.is_superuser:
+            # Check if the user has permission to add a role
+            if not request.user.has_perm('account.add_role'):
+                raise PermissionDenied({'message': "You do not have permission to create roles."})
+        # Handle unique constraint explicitly
+        if Role.objects.filter(name=request.data.get('name')).exists():
+            return Response({
+                'message': 'A role with this name already exists.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        return super().post(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        # Save and respond with a custom message
+        role = serializer.save()
+        return Response({
+            'message': 'Role created successfully.',
+            'data': RoleSerializer(role).data
+        }, status=status.HTTP_201_CREATED)
+
+class RoleRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    API view to retrieve, update, or delete a role. Ensures only users with appropriate permissions or superusers can access.
+    """
+    queryset = Role.objects.all()
+    serializer_class = RoleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        role = get_object_or_404(Role, pk=self.kwargs['pk'])
+        return role
+
+    def get(self, request, *args, **kwargs):
+        # Superusers have unrestricted access
+        if not request.user.is_superuser:
+            # Check if the user has permission to view roles
+            if not request.user.has_perm('account.view_role'):
+                raise PermissionDenied({'message': "You do not have permission to view roles."})
+        return super().retrieve(request, *args, **kwargs)
+
+    def put(self, request, *args, **kwargs):
+        # Superusers can perform any action
+        if not request.user.is_superuser:
+            # Check if the user has permission to change roles
+            if not request.user.has_perm('account.change_role'):
+                raise PermissionDenied({'message': "You do not have permission to update roles."})
+
+        # Check for unique role name excluding the current role
+        if Role.objects.filter(name=request.data.get('name')).exclude(id=kwargs['pk']).exists():
+            return Response({
+                'message': 'A role with this name already exists.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        response = super().update(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            response.data['message'] = 'Role updated successfully.'
+            return Response(response.data, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'message': 'Role update failed.',
+                'errors': response.data
+            }, status=response.status_code)
+
+    def delete(self, request, *args, **kwargs):
+        # Superusers can perform any action
+        if not request.user.is_superuser:
+            # Check if the user has permission to delete roles
+            if not request.user.has_perm('account.delete_role'):
+                raise PermissionDenied({'message': "You do not have permission to delete roles."})
+
+        role = self.get_object()
+        role.delete()
+        return Response({'message': 'Role deleted successfully.'}, status=status.HTTP_200_OK)
 
 class PermissionListView(generics.ListAPIView):
     """
