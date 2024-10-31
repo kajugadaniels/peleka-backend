@@ -19,27 +19,31 @@ class RoleSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     role_name = serializers.CharField(source='role.name', read_only=True)
     user_permissions = serializers.SerializerMethodField()
-    user_permission_names = serializers.SerializerMethodField()  # Corrected field for permission names
 
     class Meta:
         model = User
         fields = (
-            'id', 'name', 'email', 'phone_number', 'role', 'role_name',
-            'password', 'user_permissions', 'user_permission_names'
+            'id', 'name', 'email', 'phone_number', 'role', 'role_name', 'password', 'user_permissions'
         )
         extra_kwargs = {
             'password': {'write_only': True}  # Password should be write-only for security
         }
 
     def get_user_permissions(self, obj):
-        """Retrieve the user's direct permissions as permission codes."""
-        return obj.get_all_permissions()
-
-    def get_user_permission_names(self, obj):
-        """Retrieve the user's direct permissions as permission names."""
-        permission_codenames = {perm.split('.')[1] for perm in obj.get_all_permissions()}
-        permissions = Permission.objects.filter(codename__in=permission_codenames)
-        return [permission.name for permission in permissions]
+        """
+        Retrieve detailed information for the user's direct permissions.
+        """
+        permissions = obj.user_permissions.all()
+        detailed_permissions = [
+            {
+                'id': perm.id,
+                'name': perm.name,
+                'codename': perm.codename,
+                'content_type': perm.content_type.model
+            }
+            for perm in permissions
+        ]
+        return detailed_permissions
 
     def create(self, validated_data):
         """
