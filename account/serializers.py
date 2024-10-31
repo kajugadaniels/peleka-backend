@@ -16,9 +16,6 @@ class RoleSerializer(serializers.ModelSerializer):
         model = Role
         fields = ('id', 'name')
 
-from django.contrib.auth.models import Permission
-from account.models import User
-
 class UserSerializer(serializers.ModelSerializer):
     role_name = serializers.CharField(source='role.name', read_only=True)
     user_permissions = serializers.SerializerMethodField()
@@ -33,20 +30,8 @@ class UserSerializer(serializers.ModelSerializer):
         }
 
     def get_user_permissions(self, obj):
-        """
-        Retrieve detailed information for the user's direct permissions.
-        """
-        permissions = obj.user_permissions.all()
-        detailed_permissions = [
-            {
-                'id': perm.id,
-                'name': perm.name,
-                'codename': perm.codename,
-                'content_type': perm.content_type.model
-            }
-            for perm in permissions
-        ]
-        return detailed_permissions
+        """Retrieve the user's direct permissions."""
+        return obj.get_all_permissions()
 
     def create(self, validated_data):
         """
