@@ -299,31 +299,31 @@ class UserDetailView(APIView):
 class RiderListCreateView(generics.ListCreateAPIView):
     """
     API view to list all Riders and allow creation of new Riders.
-    - Only accessible to users with 'view_rider' or 'add_rider' permissions.
+    - Accessible to users with 'view_rider' or 'add_rider' permissions.
     """
     queryset = Rider.objects.all()
     serializer_class = RiderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        # Ensure user has 'view_rider' permission to list Riders
-        if not self.request.user.is_superuser and not self.request.user.has_perm('system.view_rider'):
-            raise PermissionDenied({'message': "You do not have permission to view this resource."})
-        return super().get_queryset()
-
-    def list(self, request, *args, **kwargs):
-        response = super().list(request, *args, **kwargs)
-        response.data = {'message': "Riders retrieved successfully", 'data': response.data}
-        return response
+    def get(self, request, *args, **kwargs):
+        # Check if the user has permission to view riders
+        if not request.user.is_superuser and not request.user.has_perm('system.view_rider'):
+            raise PermissionDenied({'message': "You do not have permission to view riders."})
+        return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
-        # Ensure user has 'add_rider' permission to create a new Rider
+        # Check if the user has permission to add a rider
         if not request.user.is_superuser and not request.user.has_perm('system.add_rider'):
-            raise PermissionDenied({'message': "You do not have permission to add this resource."})
-        
-        response = self.create(request, *args, **kwargs)
-        response.data = {'message': "Rider created successfully", 'data': response.data}
-        return response
+            raise PermissionDenied({'message': "You do not have permission to add riders."})
+        return super().post(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        # Save the rider and return a custom response
+        rider = serializer.save()
+        return Response({
+            'message': 'Rider created successfully.',
+            'data': RiderSerializer(rider).data
+        }, status=status.HTTP_201_CREATED)
 
 class RiderRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     """
