@@ -339,17 +339,17 @@ class RiderRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         if not request.user.is_superuser and not request.user.has_perm('system.view_rider'):
             raise PermissionDenied({'message': "You do not have permission to view this resource."})
         
-        response = self.retrieve(request, *args, **kwargs)
-        response.data = {'message': "Rider details retrieved successfully", 'data': response.data}
-        return response
+        # Call the default retrieve method without modifying response.data
+        return self.retrieve(request, *args, **kwargs)
 
     def put(self, request, *args, **kwargs):
         # Ensure user has 'change_rider' permission to update Rider details
         if not request.user.is_superuser and not request.user.has_perm('system.change_rider'):
             raise PermissionDenied({'message': "You do not have permission to edit this resource."})
         
+        # Call the default update method and include a success message
         response = self.update(request, *args, **kwargs)
-        response.data = {'message': "Rider updated successfully", 'data': response.data}
+        response.data = {'message': "Rider updated successfully", **response.data}
         return response
 
     def delete(self, request, *args, **kwargs):
@@ -357,6 +357,7 @@ class RiderRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         if not request.user.is_superuser and not request.user.has_perm('system.delete_rider'):
             raise PermissionDenied({'message': "You do not have permission to delete this resource."})
         
+        # Call the default destroy method and include a success message
         response = self.destroy(request, *args, **kwargs)
         response.data = {'message': "Rider deleted successfully"}
         return response
