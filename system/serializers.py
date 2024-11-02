@@ -7,11 +7,12 @@ class RiderSerializer(serializers.ModelSerializer):
     Serializer for the Rider model.
     Includes auto-generated, read-only code based on name initials and a unique 8-digit number.
     """
+    image = serializers.ImageField(required=False)
     code = serializers.CharField(read_only=True)  # Code is read-only
 
     class Meta:
         model = Rider
-        fields = ['id', 'name', 'phone_number', 'address', 'code', 'nid']
+        fields = ['id', 'name', 'phone_number', 'address', 'code', 'nid', 'image']
         read_only_fields = ['code']
 
     def generate_unique_code(self, name):
@@ -41,3 +42,15 @@ class RiderSerializer(serializers.ModelSerializer):
 
         # Create and return the Rider instance
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # Handle image upload separately if provided
+        if 'image' in validated_data:
+            instance.image = validated_data.pop('image')
+
+        # Update the other fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        instance.save()
+        return instance
