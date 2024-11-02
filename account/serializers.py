@@ -29,11 +29,12 @@ class RoleSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     role_name = serializers.CharField(source='role.name', read_only=True)
     user_permissions = serializers.SerializerMethodField()
+    image = serializers.ImageField(required=False)
 
     class Meta:
         model = User
         fields = (
-            'id', 'name', 'email', 'phone_number', 'role', 'role_name', 'password', 'user_permissions'
+            'id', 'name', 'email', 'phone_number', 'role', 'role_name', 'image', 'password', 'user_permissions'
         )
         extra_kwargs = {
             'password': {'write_only': True}  # Password should be write-only for security
@@ -58,6 +59,10 @@ class UserSerializer(serializers.ModelSerializer):
         """
         Update user details and hash the password if provided.
         """
+        # Handle image upload separately if provided
+        if 'image' in validated_data:
+            instance.image = validated_data.pop('image')
+
         # If a password is provided, hash it using set_password
         password = validated_data.pop('password', None)
         if password:
