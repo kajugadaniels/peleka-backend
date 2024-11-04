@@ -537,3 +537,36 @@ class RiderDeliveryListView(generics.ListAPIView):
 
         # Call the default get method to return the data
         return super().get(request, *args, **kwargs)
+
+class AddRiderDeliveryView(generics.CreateAPIView):
+    """
+    API view to add a new Rider Delivery.
+    - Accessible only to authenticated users with the 'add_riderdelivery' permission.
+    """
+    queryset = RiderDelivery.objects.all()
+    serializer_class = RiderDeliverySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        # Check if the user has permission to add a rider delivery
+        if not request.user.has_perm('system.add_riderdelivery'):
+            raise PermissionDenied({'message': "You do not have permission to add rider deliveries."})
+        
+        # Deserialize and validate the incoming data
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Save the new rider delivery instance
+        rider_delivery = serializer.save()
+
+        # Automatically update the status of the associated DeliveryRequest to "In Progress"
+        if rider_delivery.delivery_request:
+            delivery_request = rider_delivery.delivery_request
+            delivery_request.status = "In Progress"
+            delivery_request.save()
+
+        # Return a success response with the created rider delivery data
+        return Response({
+            'message': 'Rider delivery added successfully. The delivery request status is now "In Progress".',
+            'data': RiderDeliverySerializer(rider_delivery).data
+        }, status=status.HTTP_201_CREATED)
