@@ -394,18 +394,20 @@ class DeliveryRequestListView(generics.ListAPIView):
 class DeliveryRequestCreateView(generics.CreateAPIView):
     """
     API view to create a new Delivery Request.
-    - Accessible to any authenticated user.
-    - Allows users to create delivery requests with required fields.
+    - Accessible only to authenticated users with 'add_deliveryrequest' permission.
     """
     queryset = DeliveryRequest.objects.all()
     serializer_class = DeliveryRequestSerializer
-    # Only authenticated users can access this view
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         """
         Handle the creation of a new delivery request.
         """
+        # Check if the user has permission to add a delivery request
+        if not request.user.has_perm('system.add_deliveryrequest'):
+            raise PermissionDenied({'message': "You do not have permission to create delivery requests."})
+
         # Deserialize the incoming data
         serializer = self.get_serializer(data=request.data)
         
