@@ -101,12 +101,12 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
 class RiderDeliverySerializer(serializers.ModelSerializer):
     rider_name = serializers.ReadOnlyField(source='rider.name', help_text='The name of the rider')
     rider_phone = serializers.ReadOnlyField(source='rider.phone_number', help_text='The phone number of the rider')
-    delivery_request_info = serializers.SerializerMethodField(help_text='Information about the assigned delivery request, if any')
+    delivery_request_info = serializers.SerializerMethodField(help_text='Detailed information about the assigned delivery request, including client details')
 
     class Meta:
         model = RiderDelivery
         fields = [
-            'id', 'rider', 'rider_name', 'rider_phone', 'current_status', 'last_assigned_at', 
+            'id', 'rider', 'rider_name', 'rider_phone', 'current_status', 'last_assigned_at',
             'delivery_request', 'delivery_request_info'
         ]
         read_only_fields = ['id', 'rider_name', 'rider_phone', 'last_assigned_at', 'delivery_request_info']
@@ -116,13 +116,26 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         }
 
     def get_delivery_request_info(self, obj):
-        """Return limited details about the assigned delivery request if one exists."""
+        """Return comprehensive details about the assigned delivery request, including client information."""
         if obj.delivery_request:
+            delivery_request = obj.delivery_request
             return {
-                "id": obj.delivery_request.id,
-                "pickup_address": obj.delivery_request.pickup_address,
-                "delivery_address": obj.delivery_request.delivery_address,
-                "status": obj.delivery_request.status,
+                "id": delivery_request.id,
+                "pickup_address": delivery_request.pickup_address,
+                "delivery_address": delivery_request.delivery_address,
+                "package_description": delivery_request.package_description,
+                "estimated_distance_km": delivery_request.estimated_distance_km,
+                "estimated_delivery_time": delivery_request.estimated_delivery_time,
+                "value_of_product": delivery_request.value_of_product,
+                "delivery_price": delivery_request.delivery_price,
+                "status": delivery_request.status,
+                "client_info": {
+                    "name": delivery_request.client.name,
+                    "email": delivery_request.client.email,
+                    "phone_number": delivery_request.client.phone_number,
+                },
+                "created_at": delivery_request.created_at,
+                "updated_at": delivery_request.updated_at
             }
         return None
 
