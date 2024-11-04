@@ -540,36 +540,71 @@ class RiderDeliveryListView(generics.ListAPIView):
 
 class AddRiderDeliveryView(generics.CreateAPIView):
     """
-    API view to add a new Rider Delivery.
-    - Accessible only to authenticated users with the 'add_riderdelivery' permission.
+    API view to assign a rider to a delivery request.
+    - Accessible only to users with the appropriate permissions.
+    - Automatically updates the delivery request status to "In Progress" upon assignment.
     """
     queryset = RiderDelivery.objects.all()
     serializer_class = RiderDeliverySerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        # Check if the user has permission to add a rider delivery
-        if not request.user.has_perm('system.add_riderdelivery'):
-            raise PermissionDenied({'message': "You do not have permission to add rider deliveries."})
-        
-        # Deserialize and validate the incoming data
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        # Save the new rider delivery instance
-        rider_delivery = serializer.save()
+        rider_id = request.data.get('rider_id')
+        delivery_request_id = request.data.get('delivery_request_id')
 
-        # Automatically update the status of the associated DeliveryRequest to "In Progress"
-        if rider_delivery.delivery_request:
-            delivery_request = rider_delivery.delivery_request
-            delivery_request.status = "In Progress"
-            delivery_request.save()
+        # Validate input
+        if not rider_id or not delivery_request_id:
+            return Response(
+                {'message': "Both rider_id and delivery_request_id are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # Return a success response with the created rider delivery data
-        return Response({
-            'message': 'Rider delivery added successfully. The delivery request status is now "In Progress".',
-            'data': RiderDeliverySerializer(rider_delivery).data
-        }, status=status.HTTP_201_CREATED)
+        # Fetch the rider and delivery request objects
+        try:
+            rider = Rider.objects.get(id=rider_id)
+            delivery_request = DeliveryRequest.objects.get(id=delivery_request_id)
+        except Rider.DoesNotExist:
+            raise NotFound({'message': "Rider not found."})
+        except DeliveryRequest.DoesNotExist:
+            raise NotFound({'message': "Delivery request not found."})
+
+        # Check if the rider exists in the RiderDelivery table
+        try:
+            rider_delivery = RiderDelivery.objects.get(rider=rider)
+        except RiderDelivery.DoesNotExist:
+            # If not found, create a new RiderDelivery entry
+            rider_delivery = RiderDelivery.objects.create(
+                rider=rider,
+                current_status='Available'
+            )
+
+        # Check if the rider is available
+        if rider_delivery.current_status != 'Available':
+            return Response(
+                {'message': "Rider is not available for a new delivery assignment."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Assign the delivery request to the rider and update the status
+        rider_delivery.current_status = 'In Progress'
+        rider_delivery.delivery_request = delivery_request
+        rider_delivery.assigned_at = timezone.now()
+        rider_delivery.in_progress_at = timezone.now()
+        rider_delivery.save()
+
+        # Update the delivery request status
+        delivery_request.status = 'In Progress'
+        delivery_request.save()
+
+        serializer = self.get_serializer(rider_delivery)
+
+        return Response(
+            {
+                'message': "Rider assigned to delivery request successfully.",
+                'rider_delivery': serializer.data
+            },
+            status=status.HTTP_201_CREATED
+        )
 
 class RiderDeliveryDetailView(generics.RetrieveAPIView):
     """
