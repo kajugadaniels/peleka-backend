@@ -100,6 +100,7 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
 
 class RiderDeliverySerializer(serializers.ModelSerializer):
     # Rider information fields
+    rider_id = serializers.ReadOnlyField(source='rider.id', help_text='The id of the rider')
     rider_name = serializers.ReadOnlyField(source='rider.name', help_text='The name of the rider')
     rider_phone_number = serializers.ReadOnlyField(source='rider.phone_number', help_text='The phone number of the rider')
     rider_address = serializers.ReadOnlyField(source='rider.address', help_text='The address of the rider')
@@ -128,7 +129,7 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
     class Meta:
         model = RiderDelivery
         fields = [
-            'id', 'rider_name', 'rider_phone_number', 'rider_address', 'rider_code',
+            'id', 'rider_id', 'rider_name', 'rider_phone_number', 'rider_address', 'rider_code',
             'rider_nid', 'rider_image', 'current_status', 'last_assigned_at',
             'delivery_request_id', 'pickup_address', 'delivery_address',
             'package_description', 'estimated_distance_km', 'estimated_delivery_time',
@@ -136,7 +137,7 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
             'client_email', 'client_phone_number', 'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'rider_name', 'rider_phone_number', 'rider_address',
+            'id', 'rider_id', 'rider_name', 'rider_phone_number', 'rider_address',
             'rider_code', 'rider_nid', 'rider_image', 'last_assigned_at',
             'delivery_request_id', 'pickup_address', 'delivery_address',
             'package_description', 'estimated_distance_km', 'estimated_delivery_time',
