@@ -48,3 +48,4 @@ class DistancePricing(models.Model):
         if additional_distance % cls.ADDITIONAL_DISTANCE > 0:
             additional_blocks += 1
         return cls.BASE_PRICE + (additional_blocks * cls.ADDITIONAL_PRICE)
+
