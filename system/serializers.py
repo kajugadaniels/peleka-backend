@@ -96,3 +96,53 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
 
         instance.save()  # This triggers the save method to update the price
         return instance
+
+class RiderDeliverySerializer(serializers.ModelSerializer):
+    rider_name = serializers.ReadOnlyField(source='rider.name', help_text='The name of the rider')
+    rider_phone = serializers.ReadOnlyField(source='rider.phone_number', help_text='The phone number of the rider')
+    delivery_request_info = serializers.SerializerMethodField(help_text='Information about the assigned delivery request, if any')
+
+    class Meta:
+        model = RiderDelivery
+        fields = [
+            'id', 'rider', 'rider_name', 'rider_phone', 'current_status', 'last_assigned_at', 
+            'delivery_request', 'delivery_request_info'
+        ]
+        read_only_fields = ['id', 'rider_name', 'rider_phone', 'last_assigned_at', 'delivery_request_info']
+        extra_kwargs = {
+            'rider': {'write_only': True},
+            'delivery_request': {'required': False, 'allow_null': True},
+        }
+
+    def get_delivery_request_info(self, obj):
+        """Return limited details about the assigned delivery request if one exists."""
+        if obj.delivery_request:
+            return {
+                "id": obj.delivery_request.id,
+                "pickup_address": obj.delivery_request.pickup_address,
+                "delivery_address": obj.delivery_request.delivery_address,
+                "status": obj.delivery_request.status,
+            }
+        return None
+
+    def validate(self, data):
+        """Ensure that a rider cannot be assigned to a delivery if not available."""
+        if data.get('current_status') not in ['Available', 'Assigned']:
+            raise serializers.ValidationError("Rider must be either 'Available' or 'Assigned' to manage deliveries.")
+        return data
+
+    def update(self, instance, validated_data):
+        """Handle the update logic to change the rider's status and delivery assignment."""
+        delivery_request = validated_data.get('delivery_request')
+        if delivery_request:
+            if not instance.is_available():
+                raise serializers.ValidationError("Rider is not available for a new delivery assignment.")
+            instance.assign_delivery(delivery_request)
+
+        current_status = validated_data.get('current_status')
+        if current_status == 'In Progress':
+            instance.mark_as_in_progress()
+        elif current_status == 'Available':
+            instance.mark_as_available()
+
+        return super().update(instance, validated_data)
