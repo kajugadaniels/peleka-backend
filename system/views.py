@@ -460,3 +460,42 @@ class DeliveryRequestUpdateView(generics.UpdateAPIView):
             "message": "Delivery request updated successfully.",
             "data": serializer.data
         }, status=status.HTTP_200_OK)
+
+class DeleteDeliveryRequestView(generics.DestroyAPIView):
+    """
+    API view to delete a Delivery Request.
+    - Accessible only to authenticated users with the 'delete_deliveryrequest' permission.
+    """
+    queryset = DeliveryRequest.objects.all()
+    serializer_class = DeliveryRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        """
+        Retrieve and return the DeliveryRequest instance.
+        Check if the user has the permission to delete it.
+        """
+        try:
+            delivery_request = DeliveryRequest.objects.get(pk=self.kwargs['pk'], delete_status=False)
+        except DeliveryRequest.DoesNotExist:
+            raise NotFound({'message': "Delivery request not found or already deleted."})
+
+        # Check if the user has the 'delete_deliveryrequest' permission
+        if not self.request.user.has_perm('system.delete_deliveryrequest'):
+            raise PermissionDenied({'message': "You do not have permission to delete this delivery request."})
+
+        return delivery_request
+
+    def delete(self, request, *args, **kwargs):
+        """
+        Handle the deletion of a Delivery Request.
+        """
+        delivery_request = self.get_object()
+        delivery_request.delete_status = True
+        delivery_request.deleted_by = request.user
+        delivery_request.save()
+
+        return Response({
+            'message': "Delivery request marked as deleted successfully.",
+            'data': DeliveryRequestSerializer(delivery_request).data
+        }, status=status.HTTP_200_OK)
