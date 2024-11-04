@@ -31,7 +31,7 @@ class UserDeliveryRequestListView(generics.ListAPIView):
     API view to list all Delivery Requests for the logged-in user.
     - Accessible only to authenticated users.
     """
-    serializer_class = DeliveryRequestSerializer
+    serializer_class = UserDeliveryRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
@@ -62,7 +62,7 @@ class UserDeliveryRequestDetailView(generics.RetrieveAPIView):
     API view to retrieve a Delivery Request by ID for the logged-in user.
     - Accessible only to authenticated users.
     """
-    serializer_class = DeliveryRequestSerializer
+    serializer_class = UserDeliveryRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
@@ -79,7 +79,7 @@ class UserDeliveryRequestUpdateView(generics.UpdateAPIView):
     API view to update a Delivery Request for the logged-in user.
     - Accessible only to authenticated users.
     """
-    serializer_class = DeliveryRequestSerializer
+    serializer_class = UserDeliveryRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
@@ -112,7 +112,7 @@ class UserDeleteDeliveryRequestView(generics.DestroyAPIView):
     API view to delete a Delivery Request for the logged-in user.
     - Accessible only to authenticated users.
     """
-    serializer_class = DeliveryRequestSerializer
+    serializer_class = UserDeliveryRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
