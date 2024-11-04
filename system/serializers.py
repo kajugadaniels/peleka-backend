@@ -99,45 +99,50 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
         return instance
 
 class RiderDeliverySerializer(serializers.ModelSerializer):
+    # Rider information fields
     rider_name = serializers.ReadOnlyField(source='rider.name', help_text='The name of the rider')
-    rider_phone = serializers.ReadOnlyField(source='rider.phone_number', help_text='The phone number of the rider')
-    delivery_request_info = serializers.SerializerMethodField(help_text='Detailed information about the assigned delivery request, including client details')
+    rider_phone_number = serializers.ReadOnlyField(source='rider.phone_number', help_text='The phone number of the rider')
+    rider_address = serializers.ReadOnlyField(source='rider.address', help_text='The address of the rider')
+    rider_code = serializers.ReadOnlyField(source='rider.code', help_text='The unique code of the rider')
+    rider_nid = serializers.ReadOnlyField(source='rider.nid', help_text='The national ID of the rider')
+    rider_image = serializers.ImageField(source='rider.image', help_text='The image of the rider', read_only=True)
+
+    # Delivery request details
+    delivery_request_id = serializers.ReadOnlyField(source='delivery_request.id', help_text='The ID of the delivery request')
+    pickup_address = serializers.ReadOnlyField(source='delivery_request.pickup_address', help_text='The pickup address of the delivery request')
+    delivery_address = serializers.ReadOnlyField(source='delivery_request.delivery_address', help_text='The delivery address of the delivery request')
+    package_description = serializers.ReadOnlyField(source='delivery_request.package_description', help_text='Description of the package')
+    estimated_distance_km = serializers.ReadOnlyField(source='delivery_request.estimated_distance_km', help_text='The estimated distance in kilometers')
+    estimated_delivery_time = serializers.ReadOnlyField(source='delivery_request.estimated_delivery_time', help_text='The estimated delivery time')
+    value_of_product = serializers.ReadOnlyField(source='delivery_request.value_of_product', help_text='The value of the product being delivered')
+    delivery_price = serializers.ReadOnlyField(source='delivery_request.delivery_price', help_text='The delivery price calculated')
+    status = serializers.ReadOnlyField(source='delivery_request.status', help_text='The status of the delivery request')
+
+    # Client information
+    client_name = serializers.ReadOnlyField(source='delivery_request.client.name', help_text='The name of the client')
+    client_email = serializers.ReadOnlyField(source='delivery_request.client.email', help_text='The email of the client')
+    client_phone_number = serializers.ReadOnlyField(source='delivery_request.client.phone_number', help_text='The phone number of the client')
+    created_at = serializers.ReadOnlyField(source='delivery_request.created_at', help_text='The creation date of the delivery request')
+    updated_at = serializers.ReadOnlyField(source='delivery_request.updated_at', help_text='The last update date of the delivery request')
 
     class Meta:
         model = RiderDelivery
         fields = [
-            'id', 'rider', 'rider_name', 'rider_phone', 'current_status', 'last_assigned_at',
-            'delivery_request', 'delivery_request_info'
+            'id', 'rider_name', 'rider_phone_number', 'rider_address', 'rider_code',
+            'rider_nid', 'rider_image', 'current_status', 'last_assigned_at',
+            'delivery_request_id', 'pickup_address', 'delivery_address',
+            'package_description', 'estimated_distance_km', 'estimated_delivery_time',
+            'value_of_product', 'delivery_price', 'status', 'client_name',
+            'client_email', 'client_phone_number', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'rider_name', 'rider_phone', 'last_assigned_at', 'delivery_request_info']
-        extra_kwargs = {
-            'rider': {'write_only': True},
-            'delivery_request': {'required': False, 'allow_null': True},
-        }
-
-    def get_delivery_request_info(self, obj):
-        """Return comprehensive details about the assigned delivery request, including client information."""
-        if obj.delivery_request:
-            delivery_request = obj.delivery_request
-            return {
-                "id": delivery_request.id,
-                "pickup_address": delivery_request.pickup_address,
-                "delivery_address": delivery_request.delivery_address,
-                "package_description": delivery_request.package_description,
-                "estimated_distance_km": delivery_request.estimated_distance_km,
-                "estimated_delivery_time": delivery_request.estimated_delivery_time,
-                "value_of_product": delivery_request.value_of_product,
-                "delivery_price": delivery_request.delivery_price,
-                "status": delivery_request.status,
-                "client_info": {
-                    "name": delivery_request.client.name,
-                    "email": delivery_request.client.email,
-                    "phone_number": delivery_request.client.phone_number,
-                },
-                "created_at": delivery_request.created_at,
-                "updated_at": delivery_request.updated_at
-            }
-        return None
+        read_only_fields = [
+            'id', 'rider_name', 'rider_phone_number', 'rider_address',
+            'rider_code', 'rider_nid', 'rider_image', 'last_assigned_at',
+            'delivery_request_id', 'pickup_address', 'delivery_address',
+            'package_description', 'estimated_distance_km', 'estimated_delivery_time',
+            'value_of_product', 'delivery_price', 'status', 'client_name',
+            'client_email', 'client_phone_number', 'created_at', 'updated_at'
+        ]
 
     def validate(self, data):
         """Ensure that a rider cannot be assigned to a delivery if not available."""
