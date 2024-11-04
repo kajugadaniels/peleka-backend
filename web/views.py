@@ -98,11 +98,6 @@ class UserDeliveryRequestUpdateView(generics.UpdateAPIView):
         serializer = self.get_serializer(delivery_request, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
-        # Recalculate estimated delivery time if distance is updated
-        if 'estimated_distance_km' in serializer.validated_data:
-            estimated_distance_km = serializer.validated_data['estimated_distance_km']
-            delivery_request.estimated_delivery_time = self.calculate_estimated_time(estimated_distance_km)
-
         # Save the updated delivery request
         self.perform_update(serializer)
 
@@ -110,10 +105,6 @@ class UserDeliveryRequestUpdateView(generics.UpdateAPIView):
             "message": "Delivery request updated successfully.",
             "data": serializer.data
         }, status=status.HTTP_200_OK)
-
-    def calculate_estimated_time(self, distance_km):
-        from datetime import timedelta
-        return timezone.now() + timedelta(minutes=int(distance_km * 10))
 
 class UserDeleteDeliveryRequestView(generics.DestroyAPIView):
     """
