@@ -54,3 +54,45 @@ class RiderSerializer(serializers.ModelSerializer):
         
         instance.save()
         return instance
+
+class DeliveryRequestSerializer(serializers.ModelSerializer):
+    client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the request')
+    client_email = serializers.ReadOnlyField(source='client.email', help_text='The email of the client who made the request')
+    delivery_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True, help_text='Automatically calculated price based on distance')
+
+    class Meta:
+        model = DeliveryRequest
+        fields = [
+            'id', 'client', 'client_name', 'client_email', 'pickup_address', 'delivery_address', 
+            'package_description', 'estimated_distance_km', 'estimated_delivery_time',
+            'value_of_product', 'delivery_price', 'image', 'status', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'delivery_price']
+        extra_kwargs = {
+            'client': {'write_only': True},
+            'image': {'required': False, 'allow_null': True},
+        }
+
+    def validate_estimated_distance_km(self, value):
+        """Ensure that the estimated distance is positive."""
+        if value <= 0:
+            raise serializers.ValidationError("Estimated distance must be greater than zero.")
+        return value
+
+    def create(self, validated_data):
+        """Override create method to ensure price calculation on creation."""
+        delivery_request = DeliveryRequest(**validated_data)
+        delivery_request.save()  # This triggers the save method in the model to calculate price
+        return delivery_request
+
+    def update(self, instance, validated_data):
+        """Override update method to handle image updates and price recalculation."""
+        image = validated_data.pop('image', None)
+        if image is not None:
+            instance.image = image
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()  # This triggers the save method to update the price
+        return instance
