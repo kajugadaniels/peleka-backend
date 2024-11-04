@@ -1,4 +1,5 @@
 import os
+from account.models import *
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
@@ -49,3 +50,50 @@ class DistancePricing(models.Model):
             additional_blocks += 1
         return cls.BASE_PRICE + (additional_blocks * cls.ADDITIONAL_PRICE)
 
+# Function to define the image upload path for delivery requests
+def delivery_request_image_path(instance, filename):
+    base_filename, file_extension = os.path.splitext(filename)
+    return f'delivery_requests/request_{slugify(instance.client.username)}_{instance.created_at}{file_extension}'
+
+class DeliveryRequest(models.Model):
+    REQUEST_STATUS_CHOICES = [
+        ('Pending', 'Pending'),
+        ('Accepted', 'Accepted'),
+        ('In Progress', 'In Progress'),
+        ('Completed', 'Completed'),
+        ('Cancelled', 'Cancelled'),
+    ]
+
+    client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='delivery_requests', help_text='The client who requested the delivery')
+    pickup_address = models.TextField(help_text='The address where the package should be picked up')
+    delivery_address = models.TextField(help_text='The address where the package should be delivered')
+    package_description = models.TextField(help_text='A description of the package to be delivered')
+    estimated_distance_km = models.FloatField(help_text='Estimated distance of the delivery in kilometers')
+    estimated_delivery_time = models.DateTimeField(help_text='The estimated time for the package to be delivered')
+    value_of_product = models.DecimalField(max_digits=10, decimal_places=2, help_text='The value of the product being delivered in RWF')
+    delivery_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text='The calculated price for the delivery in RWF')
+    image = ProcessedImageField(
+        upload_to=delivery_request_image_path,
+        processors=[ResizeToFill(1000, 1000)],
+        format='JPEG',
+        options={'quality': 90},
+        null=True,
+        blank=True,
+        help_text='An optional image of the package'
+    )
+    status = models.CharField(max_length=20, choices=REQUEST_STATUS_CHOICES, default='Pending', help_text='The current status of the delivery request')
+    created_at = models.DateTimeField(auto_now_add=True, help_text='The date and time when the request was created')
+    updated_at = models.DateTimeField(auto_now=True, help_text='The date and time when the request was last updated')
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Delivery Request'
+        verbose_name_plural = 'Delivery Requests'
+
+    def __str__(self):
+        return f"Delivery Request by {self.client} - {self.status}"
+
+    def save(self, *args, **kwargs):
+        # Automatically calculate the delivery price based on distance
+        self.delivery_price = DistancePricing.calculate_price(self.estimated_distance_km)
+        super().save(*args, **kwargs)
