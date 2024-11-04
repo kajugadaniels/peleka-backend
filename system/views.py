@@ -429,7 +429,7 @@ class DeliveryRequestCreateView(generics.CreateAPIView):
 class DeliveryRequestDetailView(generics.RetrieveAPIView):
     """
     API view to retrieve a Delivery Request by its ID.
-    - Accessible to any authenticated user.
+    - Accessible only to authenticated users with 'view_deliveryrequest' permission.
     """
     queryset = DeliveryRequest.objects.all()
     serializer_class = DeliveryRequestSerializer
@@ -438,8 +438,13 @@ class DeliveryRequestDetailView(generics.RetrieveAPIView):
     def get_object(self):
         """
         Retrieve and return the DeliveryRequest instance by ID.
-        If not found, raise a NotFound exception.
+        - Check if the user has permission to view the delivery request.
+        - If not found, raise a NotFound exception.
         """
+        # Check if the user has the 'view_deliveryrequest' permission
+        if not self.request.user.has_perm('system.view_deliveryrequest'):
+            raise PermissionDenied({'message': "You do not have permission to view this delivery request."})
+
         try:
             # Fetch the delivery request object by its primary key (ID)
             return DeliveryRequest.objects.get(pk=self.kwargs['pk'])
