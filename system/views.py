@@ -1,16 +1,14 @@
 from system.models import *
 from system.serializers import *
 from account.serializers import *
-from django.db import transaction
-from django.db.models import Count, Q
 from rest_framework.views import APIView
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.exceptions import NotFound
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import PermissionDenied
 from rest_framework import generics, permissions, status
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
 
 class RoleListCreateView(generics.ListCreateAPIView):
     """
@@ -411,3 +409,24 @@ class DeliveryRequestCreateView(generics.CreateAPIView):
             },
             status=status.HTTP_201_CREATED
         )
+
+class DeliveryRequestDetailView(generics.RetrieveAPIView):
+    """
+    API view to retrieve a Delivery Request by its ID.
+    - Accessible to any authenticated user.
+    """
+    queryset = DeliveryRequest.objects.all()
+    serializer_class = DeliveryRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        """
+        Retrieve and return the DeliveryRequest instance by ID.
+        If not found, raise a NotFound exception.
+        """
+        try:
+            # Fetch the delivery request object by its primary key (ID)
+            return DeliveryRequest.objects.get(pk=self.kwargs['pk'])
+        except DeliveryRequest.DoesNotExist:
+            # Raise a NotFound exception if the object does not exist
+            raise NotFound({'message': "Delivery request not found."})
