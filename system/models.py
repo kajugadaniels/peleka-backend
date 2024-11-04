@@ -97,3 +97,49 @@ class DeliveryRequest(models.Model):
         # Automatically calculate the delivery price based on distance
         self.delivery_price = DistancePricing.calculate_price(self.estimated_distance_km)
         super().save(*args, **kwargs)
+
+class RiderDelivery(models.Model):
+    RIDER_STATUS_CHOICES = [
+        ('Available', 'Available'),
+        ('Assigned', 'Assigned'),
+        ('In Progress', 'In Progress'),
+        ('Unavailable', 'Unavailable'),
+    ]
+
+    rider = models.OneToOneField(User, on_delete=models.CASCADE, related_name='rider_delivery', help_text='The rider assigned to deliveries')
+    current_status = models.CharField(max_length=20, choices=RIDER_STATUS_CHOICES, default='Available', help_text='Current status of the rider')
+    last_assigned_at = models.DateTimeField(blank=True, null=True, help_text='The last time the rider was assigned a delivery')
+    delivery_request = models.OneToOneField(DeliveryRequest, on_delete=models.SET_NULL, null=True, blank=True, related_name='rider_assignment', help_text='The delivery request currently assigned to the rider')
+
+    class Meta:
+        verbose_name = 'Rider Delivery'
+        verbose_name_plural = 'Rider Deliveries'
+
+    def __str__(self):
+        return f"Rider: {self.rider.name} - Status: {self.current_status}"
+
+    def is_available(self):
+        """Check if the rider is available for a new delivery."""
+        return self.current_status == 'Available'
+
+    def assign_delivery(self, delivery_request):
+        """Assign a delivery request to the rider if they are available."""
+        if self.is_available():
+            self.current_status = 'Assigned'
+            self.delivery_request = delivery_request
+            self.last_assigned_at = timezone.now()
+            self.save()
+            return True
+        return False
+
+    def mark_as_in_progress(self):
+        """Mark the rider as 'In Progress' when they start the delivery."""
+        if self.current_status == 'Assigned' and self.delivery_request:
+            self.current_status = 'In Progress'
+            self.save()
+
+    def mark_as_available(self):
+        """Mark the rider as 'Available' after completing the delivery."""
+        self.current_status = 'Available'
+        self.delivery_request = None
+        self.save()
