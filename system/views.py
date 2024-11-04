@@ -361,3 +361,20 @@ class RiderRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         response = self.destroy(request, *args, **kwargs)
         response.data = {'message': "Rider deleted successfully"}
         return response
+
+class DeliveryRequestListView(generics.ListAPIView):
+    """
+    API view to list all Delivery Requests.
+    - Accessible only to users with 'view_deliveryrequest' permission.
+    """
+    queryset = DeliveryRequest.objects.all().order_by('-created_at')
+    serializer_class = DeliveryRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        # Check if the user has permission to view delivery requests
+        if not request.user.is_superuser and not request.user.has_perm('system.view_deliveryrequest'):
+            raise PermissionDenied({'message': "You do not have permission to view delivery requests."})
+        
+        # Call the default get method to list delivery requests
+        return super().get(request, *args, **kwargs)
