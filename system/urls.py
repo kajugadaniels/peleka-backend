@@ -23,4 +23,5 @@ urlpatterns = [
     path('delivery-requests/', DeliveryRequestListView.as_view(), name='deliveryRequestList'),
     path('delivery-request/', DeliveryRequestCreateView.as_view(), name='deliveryRequest'),
     path('delivery-request/<int:pk>/', DeliveryRequestDetailView.as_view(), name='deliveryRequestDetail'),
+    path('delivery-request/update/<int:pk>/', DeliveryRequestUpdateView.as_view(), name='updateDeliveryRequest'),
 ]  + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -430,3 +430,33 @@ class DeliveryRequestDetailView(generics.RetrieveAPIView):
         except DeliveryRequest.DoesNotExist:
             # Raise a NotFound exception if the object does not exist
             raise NotFound({'message': "Delivery request not found."})
+
+class DeliveryRequestUpdateView(generics.UpdateAPIView):
+    """
+    API view to update a DeliveryRequest.
+    - Only accessible to authenticated users with 'change_deliveryrequest' permission.
+    """
+    queryset = DeliveryRequest.objects.all()
+    serializer_class = DeliveryRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def put(self, request, *args, **kwargs):
+        # Check if the user has permission to change the delivery request
+        if not request.user.has_perm('system.change_deliveryrequest'):
+            raise PermissionDenied({"message": "You do not have permission to change this delivery request."})
+
+        return self.update(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        # Retrieve the DeliveryRequest object
+        delivery_request = self.get_object()
+        
+        # Use the serializer to update the object with validated data
+        serializer = self.get_serializer(delivery_request, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response({
+            "message": "Delivery request updated successfully.",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
