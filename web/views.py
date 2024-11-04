@@ -1,4 +1,5 @@
 from system.models import *
+from web.serializers import *
 from system.serializers import *
 from account.serializers import *
 from rest_framework.response import Response
@@ -46,12 +47,12 @@ class UserDeliveryRequestCreateView(generics.CreateAPIView):
     API view to create a new Delivery Request for the logged-in user.
     - Accessible only to authenticated users.
     """
-    serializer_class = DeliveryRequestSerializer
+    serializer_class = UserDeliveryRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        # Save the delivery request with the logged-in user as the client
-        serializer.save(client=self.request.user)
+        # Automatically set the client as the logged-in user
+        serializer.save(client=self.request.user, status="Pending")
 
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
