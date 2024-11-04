@@ -82,6 +82,8 @@ class DeliveryRequest(models.Model):
         help_text='An optional image of the package'
     )
     status = models.CharField(max_length=20, choices=REQUEST_STATUS_CHOICES, default='Pending', help_text='The current status of the delivery request')
+    delete_status = models.BooleanField(default=False, help_text='Indicates if the delivery request has been deleted')
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='deleted_delivery_requests', help_text='The user who deleted the delivery request')
     created_at = models.DateTimeField(auto_now_add=True, help_text='The date and time when the request was created')
     updated_at = models.DateTimeField(auto_now=True, help_text='The date and time when the request was last updated')
 
