@@ -601,13 +601,5 @@ class RiderDeliveryDetailView(generics.RetrieveAPIView):
         Handle GET requests to retrieve rider delivery details.
         - Return a detailed response with rider and delivery request information.
         """
-        rider_delivery = self.get_object()
-        serializer = self.get_serializer(rider_delivery)
-
-        return Response(
-            {
-                'message': 'Rider delivery details retrieved successfully.',
-                'data': serializer.data
-            },
-            status=status.HTTP_200_OK
-        )
+        # Call the default retrieve method without modifying the response structure
+        return self.retrieve(request, *args, **kwargs)
