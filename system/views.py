@@ -364,16 +364,30 @@ class DeliveryRequestListView(generics.ListAPIView):
     """
     API view to list all Delivery Requests.
     - Accessible only to users with 'view_deliveryrequest' permission.
+    - Superusers can view all requests, including those marked as deleted.
     """
-    queryset = DeliveryRequest.objects.all().order_by('-created_at')
     serializer_class = DeliveryRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        # Superusers can see all delivery requests, including deleted ones
+        if user.is_superuser:
+            return DeliveryRequest.objects.all().order_by('-created_at')
+
+        # Other users can only see non-deleted delivery requests
+        if user.has_perm('system.view_deliveryrequest'):
+            return DeliveryRequest.objects.filter(delete_status=False).order_by('-created_at')
+
+        # If the user does not have the required permission, return an empty queryset
+        return DeliveryRequest.objects.none()
 
     def get(self, request, *args, **kwargs):
         # Check if the user has permission to view delivery requests
         if not request.user.is_superuser and not request.user.has_perm('system.view_deliveryrequest'):
             raise PermissionDenied({'message': "You do not have permission to view delivery requests."})
-        
+
         # Call the default get method to list delivery requests
         return super().get(request, *args, **kwargs)
 
