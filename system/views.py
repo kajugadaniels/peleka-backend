@@ -378,3 +378,36 @@ class DeliveryRequestListView(generics.ListAPIView):
         
         # Call the default get method to list delivery requests
         return super().get(request, *args, **kwargs)
+
+class DeliveryRequestCreateView(generics.CreateAPIView):
+    """
+    API view to create a new Delivery Request.
+    - Accessible to any authenticated user.
+    - Allows users to create delivery requests with required fields.
+    """
+    queryset = DeliveryRequest.objects.all()
+    serializer_class = DeliveryRequestSerializer
+    # Only authenticated users can access this view
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        """
+        Handle the creation of a new delivery request.
+        """
+        # Deserialize the incoming data
+        serializer = self.get_serializer(data=request.data)
+        
+        # Check if the provided data is valid
+        serializer.is_valid(raise_exception=True)
+        
+        # Save the delivery request and get the instance
+        delivery_request = serializer.save()
+        
+        # Return a success response with the created data
+        return Response(
+            {
+                'message': 'Delivery request created successfully.',
+                'data': DeliveryRequestSerializer(delivery_request).data
+            },
+            status=status.HTTP_201_CREATED
+        )
