@@ -50,20 +50,8 @@ class UserDeliveryRequestCreateView(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        user = self.request.user
-        estimated_distance_km = serializer.validated_data.get('estimated_distance_km')
-
-        # Calculate the estimated delivery time based on distance (example logic)
-        estimated_delivery_time = self.calculate_estimated_time(estimated_distance_km)
-
         # Save the delivery request with the logged-in user as the client
-        serializer.save(client=user, estimated_delivery_time=estimated_delivery_time, status='Pending')
-
-    def calculate_estimated_time(self, distance_km):
-        # Example logic to calculate estimated delivery time
-        # Here we add 10 minutes for every kilometer
-        from datetime import timedelta
-        return timezone.now() + timedelta(minutes=int(distance_km * 10))
+        serializer.save(client=self.request.user)
 
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
