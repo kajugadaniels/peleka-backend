@@ -570,3 +570,44 @@ class AddRiderDeliveryView(generics.CreateAPIView):
             'message': 'Rider delivery added successfully. The delivery request status is now "In Progress".',
             'data': RiderDeliverySerializer(rider_delivery).data
         }, status=status.HTTP_201_CREATED)
+
+class RiderDeliveryDetailView(generics.RetrieveAPIView):
+    """
+    API view to retrieve details of a RiderDelivery by its ID.
+    - Accessible only to authenticated users with the appropriate permission.
+    """
+    queryset = RiderDelivery.objects.all()
+    serializer_class = RiderDeliverySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        """
+        Retrieve and return the RiderDelivery instance.
+        - Ensure the user has permission to view rider deliveries.
+        """
+        try:
+            rider_delivery = RiderDelivery.objects.get(pk=self.kwargs['pk'])
+        except RiderDelivery.DoesNotExist:
+            raise NotFound({'message': "Rider delivery not found."})
+
+        # Check if the user has permission to view rider deliveries
+        if not self.request.user.has_perm('system.view_riderdelivery'):
+            raise PermissionDenied({'message': "You do not have permission to view this rider delivery."})
+
+        return rider_delivery
+
+    def get(self, request, *args, **kwargs):
+        """
+        Handle GET requests to retrieve rider delivery details.
+        - Return a detailed response with rider and delivery request information.
+        """
+        rider_delivery = self.get_object()
+        serializer = self.get_serializer(rider_delivery)
+
+        return Response(
+            {
+                'message': 'Rider delivery details retrieved successfully.',
+                'data': serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
