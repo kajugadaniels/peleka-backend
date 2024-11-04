@@ -59,21 +59,19 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
     client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the request')
     client_email = serializers.ReadOnlyField(source='client.email', help_text='The email of the client who made the request')
     delivery_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True, help_text='Automatically calculated price based on distance')
-    delete_status = serializers.BooleanField(read_only=True, help_text='Indicates if the request is marked as deleted')
-    deleted_by = serializers.ReadOnlyField(source='deleted_by.name', help_text='The user who marked this request as deleted')
 
     class Meta:
         model = DeliveryRequest
         fields = [
-            'id', 'client', 'client_name', 'client_email', 'pickup_address', 'delivery_address', 
+            'id', 'client', 'client_name', 'client_email', 'pickup_address', 'delivery_address',
             'package_description', 'estimated_distance_km', 'estimated_delivery_time',
-            'value_of_product', 'delivery_price', 'image', 'status', 'delete_status', 
-            'deleted_by', 'created_at', 'updated_at'
+            'value_of_product', 'delivery_price', 'image', 'status', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'delivery_price', 'delete_status', 'deleted_by']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'delivery_price']
         extra_kwargs = {
             'client': {'write_only': True},
             'image': {'required': False, 'allow_null': True},
+            'estimated_delivery_time': {'required': True}  # Ensure this field is mandatory
         }
 
     def validate_estimated_distance_km(self, value):
@@ -89,7 +87,7 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
         return delivery_request
 
     def update(self, instance, validated_data):
-        """Override update method to handle image updates and price recalculation."""
+        """Override update method to handle image updates and other changes."""
         image = validated_data.pop('image', None)
         if image is not None:
             instance.image = image
@@ -97,7 +95,7 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        instance.save()  # This triggers the save method to update the price
+        instance.save()  # Trigger the save method in the model to recalculate price if necessary
         return instance
 
 class RiderDeliverySerializer(serializers.ModelSerializer):
