@@ -108,10 +108,16 @@ class RiderDelivery(models.Model):
         ('Unavailable', 'Unavailable'),
     ]
 
-    rider = models.OneToOneField(User, on_delete=models.CASCADE, related_name='rider_delivery', help_text='The rider assigned to deliveries')
+    # Updated to reference the Rider model instead of the User model
+    rider = models.OneToOneField(Rider, on_delete=models.CASCADE, related_name='rider_delivery', help_text='The rider assigned to deliveries')
     current_status = models.CharField(max_length=20, choices=RIDER_STATUS_CHOICES, default='Available', help_text='Current status of the rider')
     last_assigned_at = models.DateTimeField(blank=True, null=True, help_text='The last time the rider was assigned a delivery')
     delivery_request = models.OneToOneField(DeliveryRequest, on_delete=models.SET_NULL, null=True, blank=True, related_name='rider_assignment', help_text='The delivery request currently assigned to the rider')
+    
+    # New timestamp fields
+    assigned_at = models.DateTimeField(blank=True, null=True, help_text='The timestamp when the rider was assigned to a delivery')
+    in_progress_at = models.DateTimeField(blank=True, null=True, help_text='The timestamp when the delivery started')
+    delivered_at = models.DateTimeField(blank=True, null=True, help_text='The timestamp when the delivery was completed')
 
     class Meta:
         verbose_name = 'Rider Delivery'
@@ -130,6 +136,7 @@ class RiderDelivery(models.Model):
             self.current_status = 'Assigned'
             self.delivery_request = delivery_request
             self.last_assigned_at = timezone.now()
+            self.assigned_at = timezone.now()  # Track the assigned timestamp
             self.save()
             return True
         return False
@@ -138,10 +145,12 @@ class RiderDelivery(models.Model):
         """Mark the rider as 'In Progress' when they start the delivery."""
         if self.current_status == 'Assigned' and self.delivery_request:
             self.current_status = 'In Progress'
+            self.in_progress_at = timezone.now()  # Track when delivery starts
             self.save()
 
     def mark_as_available(self):
         """Mark the rider as 'Available' after completing the delivery."""
         self.current_status = 'Available'
         self.delivery_request = None
+        self.delivered_at = timezone.now()  # Track when delivery is completed
         self.save()
