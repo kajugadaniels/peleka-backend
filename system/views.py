@@ -520,3 +520,20 @@ class DeleteDeliveryRequestView(generics.DestroyAPIView):
             'message': "Delivery request marked as deleted successfully.",
             'data': DeliveryRequestSerializer(delivery_request).data
         }, status=status.HTTP_200_OK)
+
+class RiderDeliveryListView(generics.ListAPIView):
+    """
+    API view to list all Rider Deliveries.
+    - Accessible only to authenticated users with 'view_riderdelivery' permission.
+    """
+    queryset = RiderDelivery.objects.all().order_by('-last_assigned_at')
+    serializer_class = RiderDeliverySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        # Check if the user has the necessary permission
+        if not request.user.is_superuser and not request.user.has_perm('system.view_riderdelivery'):
+            raise PermissionDenied({'message': "You do not have permission to view rider deliveries."})
+
+        # Call the default get method to return the data
+        return super().get(request, *args, **kwargs)
