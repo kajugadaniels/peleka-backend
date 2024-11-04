@@ -126,3 +126,32 @@ class UserDeliveryRequestUpdateView(generics.UpdateAPIView):
     def calculate_estimated_time(self, distance_km):
         from datetime import timedelta
         return timezone.now() + timedelta(minutes=int(distance_km * 10))
+
+class UserDeleteDeliveryRequestView(generics.DestroyAPIView):
+    """
+    API view to delete a Delivery Request for the logged-in user.
+    - Accessible only to authenticated users.
+    """
+    serializer_class = DeliveryRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return DeliveryRequest.objects.filter(client=self.request.user, delete_status=False)
+
+    def delete(self, request, *args, **kwargs):
+        delivery_request = self.get_object()
+
+        # Check if the status allows deletion
+        if delivery_request.status not in ['Pending', 'Cancelled']:
+            return Response(
+                {'message': "Only requests with status 'Pending' or 'Cancelled' can be deleted."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Mark the delivery request as deleted
+        delivery_request.delete_status = True
+        delivery_request.save()
+
+        return Response({
+            'message': "Delivery request marked as deleted successfully."
+        }, status=status.HTTP_200_OK)
