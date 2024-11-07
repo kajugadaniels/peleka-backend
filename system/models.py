@@ -53,7 +53,7 @@ class DistancePricing(models.Model):
 # Function to define the image upload path for delivery requests
 def delivery_request_image_path(instance, filename):
     base_filename, file_extension = os.path.splitext(filename)
-    return f'delivery_requests/request_{slugify(instance.client.username)}_{instance.created_at}{file_extension}'
+    return f'delivery_requests/request_{slugify(instance.client.name)}_{instance.created_at}{file_extension}'
 
 class DeliveryRequest(models.Model):
     REQUEST_STATUS_CHOICES = [

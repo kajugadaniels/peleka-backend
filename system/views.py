@@ -513,7 +513,7 @@ class DeleteDeliveryRequestView(generics.DestroyAPIView):
         """
         delivery_request = self.get_object()
         delivery_request.delete_status = True
-        delivery_request.deleted_by = request.user
+        delivery_request.deleted_by = request.user.name
         delivery_request.save()
 
         return Response({
