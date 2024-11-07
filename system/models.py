@@ -72,7 +72,7 @@ class DeliveryRequest(models.Model):
     recipient_name = models.CharField(max_length=255, blank=True, null=True, help_text='Name of the recipient')
     recipient_phone = models.CharField(max_length=15, blank=True, null=True, help_text='Phone number of the recipient')
     estimated_distance_km = models.FloatField(blank=True, null=True, help_text='Estimated distance of the delivery in kilometers')
-    estimated_delivery_time = models.DateTimeField(blank=True, null=True, help_text='The estimated time for the package to be delivered')
+    estimated_delivery_time = models.CharField(max_length=15, blank=True, null=True, help_text='The estimated time for the package to be delivered')
     value_of_product = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text='The value of the product being delivered in RWF')
     delivery_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text='The calculated price for the delivery in RWF')
     payment_type = models.CharField(blank=True, null=True, max_length=255, help_text='The payment method for this delivery')
