@@ -65,13 +65,17 @@ class DeliveryRequest(models.Model):
     ]
 
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='delivery_requests', help_text='The client who requested the delivery')
-    pickup_address = models.TextField(help_text='The address where the package should be picked up')
-    delivery_address = models.TextField(help_text='The address where the package should be delivered')
-    package_description = models.TextField(help_text='A description of the package to be delivered')
-    estimated_distance_km = models.FloatField(help_text='Estimated distance of the delivery in kilometers')
-    estimated_delivery_time = models.DateTimeField(help_text='The estimated time for the package to be delivered')
-    value_of_product = models.DecimalField(max_digits=10, decimal_places=2, help_text='The value of the product being delivered in RWF')
+    pickup_address = models.TextField(blank=True, null=True, help_text='The address where the package should be picked up')
+    delivery_address = models.TextField(blank=True, null=True, help_text='The address where the package should be delivered')
+    package_name = models.CharField(max_length=255, blank=True, null=True, help_text='Name of the package being delivered')
+    package_description = models.TextField(blank=True, null=True, help_text='A description of the package to be delivered')
+    recipient_name = models.CharField(max_length=255, blank=True, null=True, help_text='Name of the recipient')
+    recipient_phone = models.CharField(max_length=15, blank=True, null=True, help_text='Phone number of the recipient')
+    estimated_distance_km = models.FloatField(blank=True, null=True, help_text='Estimated distance of the delivery in kilometers')
+    estimated_delivery_time = models.DateTimeField(blank=True, null=True, help_text='The estimated time for the package to be delivered')
+    value_of_product = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text='The value of the product being delivered in RWF')
     delivery_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text='The calculated price for the delivery in RWF')
+    payment_type = models.CharField(blank=True, null=True, max_length=255, help_text='The payment method for this delivery')
     image = ProcessedImageField(
         upload_to=delivery_request_image_path,
         processors=[ResizeToFill(1000, 1000)],
