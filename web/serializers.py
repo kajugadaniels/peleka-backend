@@ -9,8 +9,9 @@ class UserDeliveryRequestSerializer(serializers.ModelSerializer):
         model = DeliveryRequest
         fields = [
             'id', 'client_name', 'pickup_address', 'delivery_address', 
-            'package_description', 'estimated_distance_km', 'estimated_delivery_time', 
-            'value_of_product', 'delivery_price', 'status', 'created_at', 'updated_at'
+            'package_name', 'package_description', 'recipient_name', 'recipient_phone',
+            'estimated_distance_km', 'estimated_delivery_time', 
+            'value_of_product', 'delivery_price', 'status', 'payment_type', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'client_name', 'delivery_price', 'status', 'created_at', 'updated_at']
 
