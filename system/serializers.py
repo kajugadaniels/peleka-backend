@@ -63,15 +63,16 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeliveryRequest
         fields = [
-            'id', 'client', 'client_name', 'client_email', 'pickup_address', 'delivery_address',
-            'package_description', 'estimated_distance_km', 'estimated_delivery_time',
-            'value_of_product', 'delivery_price', 'image', 'status', 'created_at', 'updated_at'
+            'id', 'client', 'client_name', 'client_email', 'pickup_address', 'delivery_address', 
+            'package_name', 'package_description', 'recipient_name', 'recipient_phone', 
+            'estimated_distance_km', 'estimated_delivery_time', 'value_of_product', 
+            'delivery_price', 'image', 'status', 'payment_type', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'delivery_price']
         extra_kwargs = {
             'client': {'write_only': True},
             'image': {'required': False, 'allow_null': True},
-            'estimated_delivery_time': {'required': True}  # Ensure this field is mandatory
+            'estimated_delivery_time': {'required': True},  # Ensure this field is mandatory
         }
 
     def validate_estimated_distance_km(self, value):
