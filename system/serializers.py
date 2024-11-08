@@ -57,22 +57,22 @@ class RiderSerializer(serializers.ModelSerializer):
 
 class DeliveryRequestSerializer(serializers.ModelSerializer):
     client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the request')
-    client_phone = serializers.ReadOnlyField(source='client.phone_number', help_text='The email of the client who made the request')
+    client_phone = serializers.ReadOnlyField(source='client.phone_number', help_text='The phone number of the client who made the request')
     delivery_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True, help_text='Automatically calculated price based on distance')
 
     class Meta:
         model = DeliveryRequest
         fields = [
-            'id', 'client', 'client_name', 'client_phone', 'pickup_address', 'delivery_address', 
-            'package_name', 'package_description', 'recipient_name', 'recipient_phone', 
-            'estimated_distance_km', 'estimated_delivery_time', 'value_of_product', 
-            'delivery_price', 'image', 'status', 'payment_type', 'created_at', 'updated_at'
+            'id', 'client', 'client_name', 'client_phone', 'pickup_address', 'pickup_lat', 'pickup_lng',
+            'delivery_address', 'delivery_lat', 'delivery_lng', 'package_name', 'package_description',
+            'recipient_name', 'recipient_phone', 'estimated_distance_km', 'estimated_delivery_time', 
+            'value_of_product', 'delivery_price', 'image', 'status', 'payment_type', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'delivery_price']
         extra_kwargs = {
             'client': {'write_only': True},
             'image': {'required': False, 'allow_null': True},
-            'estimated_delivery_time': {'required': True},  # Ensure this field is mandatory
+            'estimated_delivery_time': {'required': True},
         }
 
     def validate_estimated_distance_km(self, value):
@@ -84,7 +84,7 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Override create method to ensure price calculation on creation."""
         delivery_request = DeliveryRequest(**validated_data)
-        delivery_request.save()  # This triggers the save method in the model to calculate price
+        delivery_request.save()  # Triggers the save method in the model to calculate price
         return delivery_request
 
     def update(self, instance, validated_data):
@@ -96,7 +96,7 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        instance.save()  # Trigger the save method in the model to recalculate price if necessary
+        instance.save()  # Trigger save method to recalculate price if necessary
         return instance
 
 class RiderDeliverySerializer(serializers.ModelSerializer):
