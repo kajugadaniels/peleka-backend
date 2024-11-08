@@ -66,7 +66,13 @@ class DeliveryRequest(models.Model):
 
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='delivery_requests', help_text='The client who requested the delivery')
     pickup_address = models.TextField(blank=True, null=True, help_text='The address where the package should be picked up')
+    pickup_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text='Latitude of the pickup location')
+    pickup_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text='Longitude of the pickup location')
+    
     delivery_address = models.TextField(blank=True, null=True, help_text='The address where the package should be delivered')
+    delivery_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text='Latitude of the delivery location')
+    delivery_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text='Longitude of the delivery location')
+
     package_name = models.CharField(max_length=255, blank=True, null=True, help_text='Name of the package being delivered')
     package_description = models.TextField(blank=True, null=True, help_text='A description of the package to be delivered')
     recipient_name = models.CharField(max_length=255, blank=True, null=True, help_text='Name of the recipient')
@@ -76,6 +82,7 @@ class DeliveryRequest(models.Model):
     value_of_product = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text='The value of the product being delivered in RWF')
     delivery_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text='The calculated price for the delivery in RWF')
     payment_type = models.CharField(blank=True, null=True, max_length=255, help_text='The payment method for this delivery')
+    
     image = ProcessedImageField(
         upload_to=delivery_request_image_path,
         processors=[ResizeToFill(1000, 1000)],
@@ -85,9 +92,11 @@ class DeliveryRequest(models.Model):
         blank=True,
         help_text='An optional image of the package'
     )
+
     status = models.CharField(max_length=20, choices=REQUEST_STATUS_CHOICES, default='Pending', help_text='The current status of the delivery request')
     delete_status = models.BooleanField(default=False, help_text='Indicates if the delivery request has been deleted')
     deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='deleted_delivery_requests', help_text='The user who deleted the delivery request')
+    
     created_at = models.DateTimeField(auto_now_add=True, help_text='The date and time when the request was created')
     updated_at = models.DateTimeField(auto_now=True, help_text='The date and time when the request was last updated')
 
