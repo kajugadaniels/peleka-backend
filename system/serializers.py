@@ -58,7 +58,7 @@ class RiderSerializer(serializers.ModelSerializer):
 class DeliveryRequestSerializer(serializers.ModelSerializer):
     client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the request')
     client_phone = serializers.ReadOnlyField(source='client.phone_number', help_text='The phone number of the client who made the request')
-    delivery_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True, help_text='Automatically calculated price based on distance')
+    delivery_price = serializers.DecimalField(max_digits=10, decimal_places=2, help_text='Automatically calculated price based on distance')
 
     class Meta:
         model = DeliveryRequest
@@ -68,20 +68,18 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
             'recipient_name', 'recipient_phone', 'estimated_distance_km', 'estimated_delivery_time', 
             'value_of_product', 'delivery_price', 'image', 'status', 'payment_type', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'delivery_price']
+        read_only_fields = ['id', 'created_at', 'updated_at']
         extra_kwargs = {
             'client': {'write_only': True},
             'image': {'required': False, 'allow_null': True},
         }
 
     def create(self, validated_data):
-        """Override create method to allow creation without distance, price, or time calculations."""
         delivery_request = DeliveryRequest(**validated_data)
         delivery_request.save()
         return delivery_request
 
     def update(self, instance, validated_data):
-        """Override update method to handle image updates and other changes."""
         image = validated_data.pop('image', None)
         if image is not None:
             instance.image = image
