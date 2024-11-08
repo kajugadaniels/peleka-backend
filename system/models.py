@@ -108,11 +108,6 @@ class DeliveryRequest(models.Model):
     def __str__(self):
         return f"Delivery Request by {self.client} - {self.status}"
 
-    def save(self, *args, **kwargs):
-        # Automatically calculate the delivery price based on distance
-        self.delivery_price = DistancePricing.calculate_price(self.estimated_distance_km)
-        super().save(*args, **kwargs)
-
 class RiderDelivery(models.Model):
     RIDER_STATUS_CHOICES = [
         ('Available', 'Available'),
