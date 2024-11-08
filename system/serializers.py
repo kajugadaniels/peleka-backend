@@ -72,19 +72,12 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'client': {'write_only': True},
             'image': {'required': False, 'allow_null': True},
-            'estimated_delivery_time': {'required': True},
         }
 
-    def validate_estimated_distance_km(self, value):
-        """Ensure that the estimated distance is positive."""
-        if value <= 0:
-            raise serializers.ValidationError("Estimated distance must be greater than zero.")
-        return value
-
     def create(self, validated_data):
-        """Override create method to ensure price calculation on creation."""
+        """Override create method to allow creation without distance, price, or time calculations."""
         delivery_request = DeliveryRequest(**validated_data)
-        delivery_request.save()  # Triggers the save method in the model to calculate price
+        delivery_request.save()
         return delivery_request
 
     def update(self, instance, validated_data):
@@ -96,7 +89,7 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        instance.save()  # Trigger save method to recalculate price if necessary
+        instance.save()
         return instance
 
 class RiderDeliverySerializer(serializers.ModelSerializer):
