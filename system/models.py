@@ -66,12 +66,12 @@ class DeliveryRequest(models.Model):
 
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='delivery_requests', help_text='The client who requested the delivery')
     pickup_address = models.TextField(blank=True, null=True, help_text='The address where the package should be picked up')
-    pickup_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text='Latitude of the pickup location')
-    pickup_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text='Longitude of the pickup location')
+    pickup_lat = models.CharField(max_length=100, null=True, blank=True, help_text='Latitude of the pickup location')
+    pickup_lng = models.CharField(max_length=100, null=True, blank=True, help_text='Longitude of the pickup location')
     
     delivery_address = models.TextField(blank=True, null=True, help_text='The address where the package should be delivered')
-    delivery_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text='Latitude of the delivery location')
-    delivery_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text='Longitude of the delivery location')
+    delivery_lat = models.CharField(max_length=100, null=True, blank=True, help_text='Latitude of the delivery location')
+    delivery_lng = models.CharField(max_length=100, null=True, blank=True, help_text='Longitude of the delivery location')
 
     package_name = models.CharField(max_length=255, blank=True, null=True, help_text='Name of the package being delivered')
     package_description = models.TextField(blank=True, null=True, help_text='A description of the package to be delivered')
