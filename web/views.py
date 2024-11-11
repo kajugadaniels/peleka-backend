@@ -40,7 +40,7 @@ class RegisterView(generics.CreateAPIView):
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [permissions.AllowAny]  # Allow any user to access this view
+    permission_classes = [permissions.AllowAny]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -58,3 +58,11 @@ class RegisterView(generics.CreateAPIView):
                 "errors": serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
 
+class RiderListView(generics.ListAPIView):
+    """
+    API view to list all Riders.
+    Accessible to anyone.
+    """
+    queryset = Rider.objects.all()
+    serializer_class = RiderSerializer
+    permission_classes = [AllowAny]
