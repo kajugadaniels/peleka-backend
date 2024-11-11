@@ -92,7 +92,7 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
 
 class RiderDeliverySerializer(serializers.ModelSerializer):
     # Rider information fields
-    rider_id = serializers.ReadOnlyField(source='rider.id', help_text='The id of the rider')
+    rider_id = serializers.ReadOnlyField(source='rider.id', help_text='The ID of the rider')
     rider_name = serializers.ReadOnlyField(source='rider.name', help_text='The name of the rider')
     rider_phone_number = serializers.ReadOnlyField(source='rider.phone_number', help_text='The phone number of the rider')
     rider_address = serializers.ReadOnlyField(source='rider.address', help_text='The address of the rider')
@@ -113,7 +113,7 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
 
     # Client information
     client_name = serializers.ReadOnlyField(source='delivery_request.client.name', help_text='The name of the client')
-    client_phone = serializers.ReadOnlyField(source='delivery_request.client.phone_number', help_text='The email of the client')
+    client_phone = serializers.ReadOnlyField(source='delivery_request.client.phone_number', help_text='The phone number of the client')
     client_phone_number = serializers.ReadOnlyField(source='delivery_request.client.phone_number', help_text='The phone number of the client')
     created_at = serializers.ReadOnlyField(source='delivery_request.created_at', help_text='The creation date of the delivery request')
     updated_at = serializers.ReadOnlyField(source='delivery_request.updated_at', help_text='The last update date of the delivery request')
@@ -122,11 +122,12 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         model = RiderDelivery
         fields = [
             'id', 'rider_id', 'rider_name', 'rider_phone_number', 'rider_address', 'rider_code',
-            'rider_nid', 'rider_image', 'current_status', 'last_assigned_at',
+            'rider_nid', 'rider_image', 'delivered', 'last_assigned_at',
             'delivery_request_id', 'pickup_address', 'delivery_address',
             'package_description', 'estimated_distance_km', 'estimated_delivery_time',
             'value_of_product', 'delivery_price', 'status', 'client_name',
-            'client_phone', 'client_phone_number', 'created_at', 'updated_at'
+            'client_phone', 'client_phone_number', 'assigned_at', 'in_progress_at', 'delivered_at',
+            'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'rider_id', 'rider_name', 'rider_phone_number', 'rider_address',
@@ -134,29 +135,43 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
             'delivery_request_id', 'pickup_address', 'delivery_address',
             'package_description', 'estimated_distance_km', 'estimated_delivery_time',
             'value_of_product', 'delivery_price', 'status', 'client_name',
-            'client_phone', 'client_phone_number', 'created_at', 'updated_at'
+            'client_phone', 'client_phone_number', 'assigned_at', 'in_progress_at',
+            'delivered_at', 'created_at', 'updated_at'
         ]
 
     def validate(self, data):
         """Ensure that a rider can be assigned only if they are available."""
-        rider = data.get('rider')
-        if rider and RiderDelivery.objects.filter(rider=rider).exclude(current_status='Available').exists():
+        rider = self.initial_data.get('rider')
+        if rider and RiderDelivery.objects.filter(rider=rider).exclude(delivered=True).exists():
             raise serializers.ValidationError("Rider is currently unavailable for a new delivery assignment.")
         return data
 
     def create(self, validated_data):
-        """Create a new RiderDelivery instance."""
-        rider = validated_data.get('rider')
-        delivery_request = validated_data.get('delivery_request')
-
-        # Set the initial status to 'In Progress'
-        validated_data['current_status'] = 'In Progress'
+        """Create a new RiderDelivery instance with assigned_at and in_progress_at set to current time."""
+        validated_data['delivered'] = False
         validated_data['assigned_at'] = timezone.now()
         validated_data['in_progress_at'] = timezone.now()
 
         # Update the delivery request status
+        delivery_request = validated_data.get('delivery_request')
         if delivery_request:
             delivery_request.status = 'In Progress'
             delivery_request.save()
 
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        """Handle the update logic to change the rider's delivery assignment."""
+        # Update delivered status
+        delivered = validated_data.get('delivered')
+        if delivered is not None:
+            instance.delivered = delivered
+            if delivered:
+                instance.delivered_at = timezone.now()
+                # Optionally, update the delivery_request status
+                if instance.delivery_request:
+                    instance.delivery_request.status = 'Completed'
+                    instance.delivery_request.save()
+
+        instance.save()
+        return instance
