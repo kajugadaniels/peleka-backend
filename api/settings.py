@@ -169,6 +169,7 @@ CSRF_TRUSTED_ORIGINS = ['https://peleka-api.up.railway.app','https://*.127.0.0.1
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:5174",
+    "http://localhost:8080",
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
