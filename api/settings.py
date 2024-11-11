@@ -170,6 +170,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:8080",
+    "http://localhost:64224",
+    "http://10.0.2.2:8000",
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
