@@ -64,3 +64,12 @@ class UserDeliveryRequestSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+
+class RiderSerializer(serializers.ModelSerializer):
+    image = serializers.ImageField(required=False)
+    code = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = Rider
+        fields = ['id', 'name', 'phone_number', 'address', 'code', 'nid', 'image']
+        read_only_fields = ['code']
