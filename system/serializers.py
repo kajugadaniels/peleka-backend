@@ -63,7 +63,7 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeliveryRequest
         fields = [
-            'id', 'client', 'client_name', 'client_phone', 'pickup_address', 'pickup_lat', 'pickup_lng',
+            'id', 'client', 'client_name', 'pickup_address', 'pickup_lat', 'pickup_lng',
             'delivery_address', 'delivery_lat', 'delivery_lng', 'package_name', 'package_description',
             'recipient_name', 'recipient_phone', 'estimated_distance_km', 'estimated_delivery_time', 
             'value_of_product', 'delivery_price', 'image', 'status', 'payment_type', 'created_at', 'updated_at'
@@ -117,8 +117,12 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
 
     # Client information
     client_name = serializers.ReadOnlyField(source='delivery_request.client.name', help_text='The name of the client')
-    client_phone = serializers.ReadOnlyField(source='delivery_request.client.phone_number', help_text='The phone number of the client')
     client_phone_number = serializers.ReadOnlyField(source='delivery_request.client.phone_number', help_text='The phone number of the client')
+
+    # Recipient information
+    recipient_name = serializers.ReadOnlyField(source='delivery_request.recipient_name', help_text='The name of the client')
+    recipient_phone = serializers.ReadOnlyField(source='delivery_request.recipient_phone', help_text='The phone number of the client')
+
     created_at = serializers.ReadOnlyField(source='delivery_request.created_at', help_text='The creation date of the delivery request')
     updated_at = serializers.ReadOnlyField(source='delivery_request.updated_at', help_text='The last update date of the delivery request')
 
@@ -130,7 +134,7 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
             'delivery_request_id', 'pickup_address', 'pickup_lat', 'pickup_lng', 'delivery_address', 'delivery_lat', 'delivery_lng',
             'package_description', 'estimated_distance_km', 'estimated_delivery_time',
             'value_of_product', 'delivery_price', 'status', 'client_name',
-            'client_phone', 'client_phone_number', 'assigned_at', 'in_progress_at', 'delivered_at',
+            'client_phone_number', 'recipient_name', 'recipient_phone', 'assigned_at', 'in_progress_at', 'delivered_at',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
@@ -139,7 +143,7 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
             'delivery_request_id', 'pickup_address', 'pickup_lat', 'pickup_lng', 'delivery_address', 'delivery_lat', 'delivery_lng',
             'package_description', 'estimated_distance_km', 'estimated_delivery_time',
             'value_of_product', 'delivery_price', 'status', 'client_name',
-            'client_phone', 'client_phone_number', 'assigned_at', 'in_progress_at',
+            'client_phone_number', 'recipient_name', 'recipient_phone', 'assigned_at', 'in_progress_at',
             'delivered_at', 'created_at', 'updated_at'
         ]
 
