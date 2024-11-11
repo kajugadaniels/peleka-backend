@@ -10,4 +10,8 @@ urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
 
     path('riders/', RiderListView.as_view(), name='getRiders'),
+    path('rider/<int:pk>/', RiderDetailView.as_view(), name='getRiderDetails'),
+
+
+    path('delivery-requests/', UserDeliveryRequestListView.as_view(), name='userDeliveryRequestList'),
 ]  + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

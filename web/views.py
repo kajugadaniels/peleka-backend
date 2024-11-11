@@ -66,3 +66,28 @@ class RiderListView(generics.ListAPIView):
     queryset = Rider.objects.all()
     serializer_class = RiderSerializer
     permission_classes = [AllowAny]
+
+class RiderDetailView(generics.RetrieveAPIView):
+    """
+    API view to retrieve Rider details.
+    Accessible to anyone.
+    """
+    queryset = Rider.objects.all()
+    serializer_class = RiderSerializer
+    permission_classes = [AllowAny]
+
+class UserDeliveryRequestListView(generics.ListAPIView):
+    """
+    API view to list all Delivery Requests for the logged-in user.
+    - Accessible only to authenticated users.
+    """
+    serializer_class = UserDeliveryRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Only fetch delivery requests made by the logged-in user
+        user = self.request.user
+        return DeliveryRequest.objects.filter(client=user, delete_status=False).order_by('-created_at')
+
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
