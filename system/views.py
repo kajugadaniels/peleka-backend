@@ -541,7 +541,7 @@ class RiderDeliveryListView(generics.ListAPIView):
 class AddRiderDeliveryView(generics.CreateAPIView):
     """
     API view to assign a rider to a delivery request.
-    - Accessible only to users with the appropriate permissions.
+    - Accessible only to authenticated users with appropriate permissions.
     - Automatically updates the delivery request status to "In Progress" upon assignment.
     """
     queryset = RiderDelivery.objects.all()
@@ -555,42 +555,42 @@ class AddRiderDeliveryView(generics.CreateAPIView):
         # Validate input
         if not rider_id or not delivery_request_id:
             return Response(
-                {'message': "Both rider_id and delivery_request_id are required."},
+                {'message': "Both 'rider_id' and 'delivery_request_id' are required."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         # Fetch the rider and delivery request objects
         try:
             rider = Rider.objects.get(id=rider_id)
-            delivery_request = DeliveryRequest.objects.get(id=delivery_request_id)
         except Rider.DoesNotExist:
             raise NotFound({'message': "Rider not found."})
+
+        try:
+            delivery_request = DeliveryRequest.objects.get(id=delivery_request_id)
         except DeliveryRequest.DoesNotExist:
             raise NotFound({'message': "Delivery request not found."})
 
-        # Check if the rider exists in the RiderDelivery table
-        try:
-            rider_delivery = RiderDelivery.objects.get(rider=rider)
-        except RiderDelivery.DoesNotExist:
-            # If not found, create a new RiderDelivery entry
-            rider_delivery = RiderDelivery.objects.create(
-                rider=rider,
-                current_status='Available'
-            )
+        # Check if the rider is available (no RiderDelivery with current_status != 'Available')
+        is_available = not RiderDelivery.objects.filter(
+            rider=rider
+        ).exclude(
+            current_status__in=['Available', 'Completed', 'Cancelled']
+        ).exists()
 
-        # Check if the rider is available
-        if rider_delivery.current_status != 'Available':
+        if not is_available:
             return Response(
                 {'message': "Rider is not available for a new delivery assignment."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Assign the delivery request to the rider and update the status
-        rider_delivery.current_status = 'In Progress'
-        rider_delivery.delivery_request = delivery_request
-        rider_delivery.assigned_at = timezone.now()
-        rider_delivery.in_progress_at = timezone.now()
-        rider_delivery.save()
+        # Create a new RiderDelivery entry
+        rider_delivery = RiderDelivery.objects.create(
+            rider=rider,
+            current_status='In Progress',
+            delivery_request=delivery_request,
+            assigned_at=timezone.now(),
+            in_progress_at=timezone.now(),
+        )
 
         # Update the delivery request status
         delivery_request.status = 'In Progress'
