@@ -106,3 +106,20 @@ class UserDeliveryRequestCreateView(generics.CreateAPIView):
 
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
+
+class UserDeliveryRequestDetailView(generics.RetrieveAPIView):
+    """
+    API view to retrieve a Delivery Request by ID for the logged-in user.
+    - Accessible only to authenticated users.
+    """
+    serializer_class = UserDeliveryRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return DeliveryRequest.objects.filter(client=self.request.user, delete_status=False)
+
+    def get_object(self):
+        try:
+            return self.get_queryset().get(pk=self.kwargs['pk'])
+        except DeliveryRequest.DoesNotExist:
+            raise NotFound({'message': "Delivery request not found."})
