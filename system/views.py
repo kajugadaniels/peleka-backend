@@ -570,26 +570,21 @@ class AddRiderDeliveryView(generics.CreateAPIView):
         except DeliveryRequest.DoesNotExist:
             raise NotFound({'message': "Delivery request not found."})
 
-        # Check if the rider is available (no RiderDelivery with current_status != 'Available')
-        is_available = not RiderDelivery.objects.filter(
-            rider=rider
-        ).exclude(
-            current_status__in=['Available', 'Completed', 'Cancelled']
-        ).exists()
-
-        if not is_available:
+        # Check if the rider is available (no RiderDelivery with delivered=False)
+        if RiderDelivery.objects.filter(rider=rider, delivered=False).exists():
             return Response(
-                {'message': "Rider is not available for a new delivery assignment."},
+                {'message': "This rider is not available at the moment."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Create a new RiderDelivery entry
+        # Assign the rider by creating a new RiderDelivery entry with delivered=False
         rider_delivery = RiderDelivery.objects.create(
             rider=rider,
-            current_status='In Progress',
             delivery_request=delivery_request,
+            delivered=False,
             assigned_at=timezone.now(),
             in_progress_at=timezone.now(),
+            last_assigned_at=timezone.now()
         )
 
         # Update the delivery request status
