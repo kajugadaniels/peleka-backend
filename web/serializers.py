@@ -1,6 +1,31 @@
 from system.models import *
 from rest_framework import serializers
 
+class UserSerializer(serializers.ModelSerializer):
+    role_name = serializers.CharField(source='role.name', read_only=True)
+    image = serializers.ImageField(required=False)
+
+    class Meta:
+        model = User
+        fields = (
+            'id', 'name', 'email', 'phone_number', 'role', 'role_name', 'image', 'password'
+        )
+        extra_kwargs = {
+            'password': {'write_only': True}
+        }
+
+    def create(self, validated_data):
+        """
+        Create a new user with a fixed role ID and hashed password.
+        """
+        validated_data['role_id'] = 1  # Ensuring the role ID is always 1
+        password = validated_data.pop('password', None)
+        user = User.objects.create_user(**validated_data)
+        if password:
+            user.set_password(password)
+        user.save()
+        return user
+
 class UserDeliveryRequestSerializer(serializers.ModelSerializer):
     client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the request')
     client_phone = serializers.ReadOnlyField(source='client.phone_number', help_text='The phone number of the client who made the request')
