@@ -63,7 +63,7 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeliveryRequest
         fields = [
-            'id', 'client', 'client_name', 'pickup_address', 'pickup_lat', 'pickup_lng',
+            'id', 'client', 'client_name', 'client_phone', 'pickup_address', 'pickup_lat', 'pickup_lng',
             'delivery_address', 'delivery_lat', 'delivery_lng', 'package_name', 'package_description',
             'recipient_name', 'recipient_phone', 'estimated_distance_km', 'estimated_delivery_time', 
             'value_of_product', 'delivery_price', 'image', 'status', 'payment_type', 'created_at', 'updated_at'
