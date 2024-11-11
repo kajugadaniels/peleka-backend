@@ -138,23 +138,25 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
-        """Ensure that a rider cannot be assigned to a delivery if not available."""
-        if data.get('current_status') not in ['Available', 'Assigned']:
-            raise serializers.ValidationError("Rider must be either 'Available' or 'Assigned' to manage deliveries.")
+        """Ensure that a rider can be assigned only if they are available."""
+        rider = data.get('rider')
+        if rider and RiderDelivery.objects.filter(rider=rider).exclude(current_status='Available').exists():
+            raise serializers.ValidationError("Rider is currently unavailable for a new delivery assignment.")
         return data
 
-    def update(self, instance, validated_data):
-        """Handle the update logic to change the rider's status and delivery assignment."""
+    def create(self, validated_data):
+        """Create a new RiderDelivery instance."""
+        rider = validated_data.get('rider')
         delivery_request = validated_data.get('delivery_request')
+
+        # Set the initial status to 'In Progress'
+        validated_data['current_status'] = 'In Progress'
+        validated_data['assigned_at'] = timezone.now()
+        validated_data['in_progress_at'] = timezone.now()
+
+        # Update the delivery request status
         if delivery_request:
-            if not instance.is_available():
-                raise serializers.ValidationError("Rider is not available for a new delivery assignment.")
-            instance.assign_delivery(delivery_request)
+            delivery_request.status = 'In Progress'
+            delivery_request.save()
 
-        current_status = validated_data.get('current_status')
-        if current_status == 'In Progress':
-            instance.mark_as_in_progress()
-        elif current_status == 'Available':
-            instance.mark_as_available()
-
-        return super().update(instance, validated_data)
+        return super().create(validated_data)
