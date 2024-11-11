@@ -6,6 +6,8 @@ from django.conf.urls.static import static
 app_name = 'web'
 
 urlpatterns = [
+    path('register/', RegisterView.as_view(), name='register'),
+
     path('riders/', RiderListView.as_view(), name='getRiders'),
     path('riders/<int:pk>/', RiderDetailView.as_view(), name='getRiderDetails'),
 
