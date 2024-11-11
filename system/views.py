@@ -456,6 +456,7 @@ class DeliveryRequestUpdateView(generics.UpdateAPIView):
     """
     API view to update a DeliveryRequest.
     - Only accessible to authenticated users with 'change_deliveryrequest' permission.
+    - Automatically sets 'delivered' to True in RiderDelivery when status is updated to 'Completed'.
     """
     queryset = DeliveryRequest.objects.all()
     serializer_class = DeliveryRequestSerializer
@@ -472,10 +473,24 @@ class DeliveryRequestUpdateView(generics.UpdateAPIView):
         # Retrieve the DeliveryRequest object
         delivery_request = self.get_object()
         
+        # Store the original status to compare later
+        original_status = delivery_request.status
+
         # Use the serializer to update the object with validated data
         serializer = self.get_serializer(delivery_request, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
+
+        # Get the updated status
+        updated_status = serializer.validated_data.get('status', original_status)
+
+        # If the status has been updated to 'Completed' and was not 'Completed' before
+        if updated_status == 'Completed' and original_status != 'Completed':
+            # Update all related RiderDelivery records to set 'delivered' to True
+            RiderDelivery.objects.filter(delivery_request=delivery_request, delivered=False).update(
+                delivered=True,
+                delivered_at=timezone.now()
+            )
 
         return Response({
             "message": "Delivery request updated successfully.",
