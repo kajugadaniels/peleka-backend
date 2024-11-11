@@ -94,15 +94,16 @@ class UserDeliveryRequestListView(generics.ListAPIView):
 
 class UserDeliveryRequestCreateView(generics.CreateAPIView):
     """
-    API view to create a new Delivery Request for the logged-in user.
+    API view to create a new Delivery Request.
     - Accessible only to authenticated users.
     """
     serializer_class = UserDeliveryRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        # Automatically set the client as the logged-in user
-        serializer.save(client=self.request.user, status="Pending")
+        # Removed the automatic setting of the client as the logged-in user
+        # Clients must be specified explicitly in the request data
+        pass
 
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
