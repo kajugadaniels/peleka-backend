@@ -28,48 +28,45 @@ class RiderDetailView(generics.RetrieveAPIView):
 
 class UserDeliveryRequestListView(generics.ListAPIView):
     """
-    API view to list all Delivery Requests.
-    - Accessible to any user.
+    API view to list all Delivery Requests for the logged-in user.
+    - Accessible only to authenticated users.
     """
     serializer_class = UserDeliveryRequestSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # Fetch all delivery requests that are not marked as deleted
-        return DeliveryRequest.objects.filter(delete_status=False).order_by('-created_at')
+        # Only fetch delivery requests made by the logged-in user
+        user = self.request.user
+        return DeliveryRequest.objects.filter(client=user, delete_status=False).order_by('-created_at')
 
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
-
 class UserDeliveryRequestCreateView(generics.CreateAPIView):
     """
-    API view to create a new Delivery Request.
-    - Accessible to any user.
+    API view to create a new Delivery Request for the logged-in user.
+    - Accessible only to authenticated users.
     """
     serializer_class = UserDeliveryRequestSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        # Ensure that the client is provided in the request data
-        client = serializer.validated_data.get('client')
-        if not client:
-            raise serializers.ValidationError({"client": "This field is required."})
-        serializer.save(status="Pending")
+        # Automatically set the client as the logged-in user
+        serializer.save(client=self.request.user, status="Pending")
 
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
 
-
 class UserDeliveryRequestDetailView(generics.RetrieveAPIView):
     """
-    API view to retrieve a Delivery Request by ID.
-    - Accessible to any user.
+    API view to retrieve a Delivery Request by ID for the logged-in user.
+    - Accessible only to authenticated users.
     """
     serializer_class = UserDeliveryRequestSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
-    queryset = DeliveryRequest.objects.filter(delete_status=False)
+    def get_queryset(self):
+        return DeliveryRequest.objects.filter(client=self.request.user, delete_status=False)
 
     def get_object(self):
         try:
@@ -77,16 +74,16 @@ class UserDeliveryRequestDetailView(generics.RetrieveAPIView):
         except DeliveryRequest.DoesNotExist:
             raise NotFound({'message': "Delivery request not found."})
 
-
 class UserDeliveryRequestUpdateView(generics.UpdateAPIView):
     """
-    API view to update a Delivery Request.
-    - Accessible to any user.
+    API view to update a Delivery Request for the logged-in user.
+    - Accessible only to authenticated users.
     """
     serializer_class = UserDeliveryRequestSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
-    queryset = DeliveryRequest.objects.filter(delete_status=False)
+    def get_queryset(self):
+        return DeliveryRequest.objects.filter(client=self.request.user, delete_status=False)
 
     def update(self, request, *args, **kwargs):
         delivery_request = self.get_object()
@@ -110,16 +107,16 @@ class UserDeliveryRequestUpdateView(generics.UpdateAPIView):
             "data": serializer.data
         }, status=status.HTTP_200_OK)
 
-
 class UserDeleteDeliveryRequestView(generics.DestroyAPIView):
     """
-    API view to delete a Delivery Request.
-    - Accessible to any user.
+    API view to delete a Delivery Request for the logged-in user.
+    - Accessible only to authenticated users.
     """
     serializer_class = UserDeliveryRequestSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
-    queryset = DeliveryRequest.objects.filter(delete_status=False)
+    def get_queryset(self):
+        return DeliveryRequest.objects.filter(client=self.request.user, delete_status=False)
 
     def delete(self, request, *args, **kwargs):
         delivery_request = self.get_object()
