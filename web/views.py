@@ -123,3 +123,36 @@ class UserDeliveryRequestDetailView(generics.RetrieveAPIView):
             return self.get_queryset().get(pk=self.kwargs['pk'])
         except DeliveryRequest.DoesNotExist:
             raise NotFound({'message': "Delivery request not found."})
+
+class UserDeliveryRequestUpdateView(generics.UpdateAPIView):
+    """
+    API view to update a Delivery Request for the logged-in user.
+    - Accessible only to authenticated users.
+    """
+    serializer_class = UserDeliveryRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return DeliveryRequest.objects.filter(client=self.request.user, delete_status=False)
+
+    def update(self, request, *args, **kwargs):
+        delivery_request = self.get_object()
+
+        # Check if the status allows updating
+        if delivery_request.status not in ['Pending', 'Cancelled']:
+            return Response(
+                {'message': "Only requests with status 'Pending' or 'Cancelled' can be updated."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Deserialize and validate the data
+        serializer = self.get_serializer(delivery_request, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        # Save the updated delivery request
+        self.perform_update(serializer)
+
+        return Response({
+            "message": "Delivery request updated successfully.",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
