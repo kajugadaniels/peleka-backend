@@ -101,6 +101,7 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
     rider_image = serializers.ImageField(source='rider.image', help_text='The image of the rider', read_only=True)
 
     # Delivery request details
+    package_name = serializers.ReadOnlyField(source='delivery_request.package_name', help_text='Name of the package')
     delivery_request_id = serializers.ReadOnlyField(source='delivery_request.id', help_text='The ID of the delivery request')
     pickup_address = serializers.ReadOnlyField(source='delivery_request.pickup_address', help_text='The pickup address of the delivery request')
     pickup_lat = serializers.ReadOnlyField(source='delivery_request.pickup_lat', help_text='The pickup address of the delivery request')
@@ -130,7 +131,7 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         model = RiderDelivery
         fields = [
             'id', 'rider_id', 'rider_name', 'rider_phone_number', 'rider_address', 'rider_code',
-            'rider_nid', 'rider_image', 'delivered', 'last_assigned_at',
+            'rider_nid', 'rider_image', 'delivered', 'last_assigned_at', 'package_name',
             'delivery_request_id', 'pickup_address', 'pickup_lat', 'pickup_lng', 'delivery_address', 'delivery_lat', 'delivery_lng',
             'package_description', 'estimated_distance_km', 'estimated_delivery_time',
             'value_of_product', 'delivery_price', 'status', 'client_name',
@@ -139,7 +140,7 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'rider_id', 'rider_name', 'rider_phone_number', 'rider_address',
-            'rider_code', 'rider_nid', 'rider_image', 'last_assigned_at',
+            'rider_code', 'rider_nid', 'rider_image', 'last_assigned_at', 'package_name',
             'delivery_request_id', 'pickup_address', 'pickup_lat', 'pickup_lng', 'delivery_address', 'delivery_lat', 'delivery_lng',
             'package_description', 'estimated_distance_km', 'estimated_delivery_time',
             'value_of_product', 'delivery_price', 'status', 'client_name',
