@@ -231,7 +231,7 @@ class UserListView(APIView):
             users = User.objects.all().order_by('-id')
         elif request.user.has_perm('account.view_user'):
             # Users with the 'view_user' permission can access all users
-            users = User.objects.all().order_by('-id')
+            users = User.objects.exclude(is_superuser=True).order_by('-id')
         else:
             # If the user lacks the necessary permission, return a forbidden response
             return Response({"error": "You do not have permission to view this resource."},
