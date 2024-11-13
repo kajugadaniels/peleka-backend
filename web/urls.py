@@ -8,6 +8,7 @@ app_name = 'web'
 urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('register/', RegisterView.as_view(), name='register'),
+    path('logout/', LogoutView.as_view(), name='logout'),
 
     path('riders/', RiderListView.as_view(), name='getRiders'),
     path('rider/<int:pk>/', RiderDetailView.as_view(), name='getRiderDetails'),

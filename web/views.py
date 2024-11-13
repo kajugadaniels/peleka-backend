@@ -1,13 +1,14 @@
 from system.models import *
 from web.serializers import *
 from web.serializers import *
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
 from rest_framework.exceptions import NotFound
-from rest_framework.permissions import AllowAny
 from rest_framework.authtoken.models import Token
 from rest_framework.generics import GenericAPIView
 from rest_framework import generics, permissions, status
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
 class LoginView(GenericAPIView):  # Change to GenericAPIView
     permission_classes = [permissions.AllowAny]
@@ -57,6 +58,21 @@ class RegisterView(generics.CreateAPIView):
                 "message": "User registration failed.",
                 "errors": serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            if hasattr(request.user, 'auth_token'):
+                request.user.auth_token.delete()
+            return Response({
+                "message": "Logout successful."
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                "error": f"An error occurred during logout: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class RiderListView(generics.ListAPIView):
     """
