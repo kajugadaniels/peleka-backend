@@ -74,6 +74,36 @@ class LogoutView(APIView):
                 "error": f"An error occurred during logout: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+class UpdateUserView(generics.UpdateAPIView):
+    """
+    API view to update user profile details.
+    - Automatically hashes the password if updated.
+    """
+    queryset = User.objects.all()
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserSerializer
+
+    def get_object(self):
+        """
+        Retrieve the current user instance.
+        """
+        return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        """
+        Update user details, including password, if provided.
+        """
+        partial = kwargs.pop('partial', True)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response({
+            "user": serializer.data,
+            "message": "Account updated successfully."
+        }, status=status.HTTP_200_OK)
+
 class RiderListView(generics.ListAPIView):
     """
     API view to list all Riders.
