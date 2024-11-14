@@ -34,12 +34,12 @@ class UserDeliveryRequestSerializer(serializers.ModelSerializer):
     client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the request')
     client_phone = serializers.ReadOnlyField(source='client.phone_number', help_text='The phone number of the client who made the request')
     delivery_price = serializers.DecimalField(max_digits=10, decimal_places=2, help_text='Automatically calculated price based on distance')
-    rider_name = serializers.ReadOnlyField(source='rider.name', help_text='The name of the rider')
-    rider_phone_number = serializers.ReadOnlyField(source='rider.phone_number', help_text='The phone number of the rider')
-    rider_address = serializers.ReadOnlyField(source='rider.address', help_text='The address of the rider')
-    rider_code = serializers.ReadOnlyField(source='rider.code', help_text='The unique code of the rider')
-    rider_nid = serializers.ReadOnlyField(source='rider.nid', help_text='The national ID of the rider')
-    rider_image = serializers.ImageField(source='rider.image', help_text='The image of the rider', read_only=True)
+    rider_name = serializers.SerializerMethodField()
+    rider_phone_number = serializers.SerializerMethodField()
+    rider_address = serializers.SerializerMethodField()
+    rider_code = serializers.SerializerMethodField()
+    rider_nid = serializers.SerializerMethodField()
+    rider_image = serializers.SerializerMethodField()
 
     class Meta:
         model = DeliveryRequest
@@ -48,7 +48,8 @@ class UserDeliveryRequestSerializer(serializers.ModelSerializer):
             'delivery_address', 'delivery_lat', 'delivery_lng', 'package_name', 'package_description',
             'recipient_name', 'recipient_phone', 'estimated_distance_km', 'estimated_delivery_time', 
             'value_of_product', 'delivery_price', 'image', 'status', 'payment_type', 
-            'created_at', 'updated_at', 'rider_name', 'rider_phone_number', 'rider_address', 'rider_code', 'rider_nid', 'rider_image',
+            'created_at', 'updated_at', 'rider_name', 'rider_phone_number', 'rider_address', 
+            'rider_code', 'rider_nid', 'rider_image'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
         extra_kwargs = {
@@ -56,11 +57,35 @@ class UserDeliveryRequestSerializer(serializers.ModelSerializer):
             'image': {'required': False, 'allow_null': True},
         }
 
-    def get_rider_info(self, obj):
-        rider_delivery = obj.rider_assignment.first()  # Assuming a reverse relationship from DeliveryRequest to RiderDelivery
+    def get_rider_info(self, obj, attribute):
+        rider_delivery = obj.rider_assignment.first()
         if rider_delivery and rider_delivery.rider:
-            return RiderSerializer(rider_delivery.rider).data
+            rider = rider_delivery.rider
+            return getattr(rider, attribute, None)
         return None
+
+    def get_rider_image(self, obj):
+        image = self.get_rider_info(obj, 'image')
+        if image:
+            request = self.context.get('request')
+            if request is not None:
+                return request.build_absolute_uri(image.url)
+        return None
+
+    def get_rider_name(self, obj):
+        return self.get_rider_info(obj, 'name')
+
+    def get_rider_phone_number(self, obj):
+        return self.get_rider_info(obj, 'phone_number')
+
+    def get_rider_address(self, obj):
+        return self.get_rider_info(obj, 'address')
+
+    def get_rider_code(self, obj):
+        return self.get_rider_info(obj, 'code')
+
+    def get_rider_nid(self, obj):
+        return self.get_rider_info(obj, 'nid')
 
     def create(self, validated_data):
         delivery_request = DeliveryRequest(**validated_data)
