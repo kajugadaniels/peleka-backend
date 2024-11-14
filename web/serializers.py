@@ -34,7 +34,12 @@ class UserDeliveryRequestSerializer(serializers.ModelSerializer):
     client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the request')
     client_phone = serializers.ReadOnlyField(source='client.phone_number', help_text='The phone number of the client who made the request')
     delivery_price = serializers.DecimalField(max_digits=10, decimal_places=2, help_text='Automatically calculated price based on distance')
-    rider_info = serializers.SerializerMethodField(help_text='Information about the rider assigned to the delivery')
+    rider_name = serializers.ReadOnlyField(source='rider.name', help_text='The name of the rider')
+    rider_phone_number = serializers.ReadOnlyField(source='rider.phone_number', help_text='The phone number of the rider')
+    rider_address = serializers.ReadOnlyField(source='rider.address', help_text='The address of the rider')
+    rider_code = serializers.ReadOnlyField(source='rider.code', help_text='The unique code of the rider')
+    rider_nid = serializers.ReadOnlyField(source='rider.nid', help_text='The national ID of the rider')
+    rider_image = serializers.ImageField(source='rider.image', help_text='The image of the rider', read_only=True)
 
     class Meta:
         model = DeliveryRequest
@@ -43,7 +48,7 @@ class UserDeliveryRequestSerializer(serializers.ModelSerializer):
             'delivery_address', 'delivery_lat', 'delivery_lng', 'package_name', 'package_description',
             'recipient_name', 'recipient_phone', 'estimated_distance_km', 'estimated_delivery_time', 
             'value_of_product', 'delivery_price', 'image', 'status', 'payment_type', 
-            'created_at', 'updated_at', 'rider_info'
+            'created_at', 'updated_at', 'rider_name', 'rider_phone_number', 'rider_address', 'rider_code', 'rider_nid', 'rider_image',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
         extra_kwargs = {
