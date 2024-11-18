@@ -299,7 +299,7 @@ class RiderListCreateView(generics.ListCreateAPIView):
     API view to list all Riders and allow creation of new Riders.
     - Accessible to users with 'view_rider' or 'add_rider' permissions.
     """
-    queryset = Rider.objects.all()
+    queryset = Rider.objects.all().order_by('-id')
     serializer_class = RiderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -328,7 +328,7 @@ class RiderRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     API view to retrieve, update, or delete a Rider.
     - Only accessible to users with 'view_rider', 'change_rider', or 'delete_rider' permissions.
     """
-    queryset = Rider.objects.all()
+    queryset = Rider.objects.all().order_by('-id')
     serializer_class = RiderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -396,7 +396,7 @@ class DeliveryRequestCreateView(generics.CreateAPIView):
     API view to create a new Delivery Request.
     - Accessible only to authenticated users with 'add_deliveryrequest' permission.
     """
-    queryset = DeliveryRequest.objects.all()
+    queryset = DeliveryRequest.objects.all().order_by('-id')
     serializer_class = DeliveryRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -431,7 +431,7 @@ class DeliveryRequestDetailView(generics.RetrieveAPIView):
     API view to retrieve a Delivery Request by its ID.
     - Accessible only to authenticated users with 'view_deliveryrequest' permission.
     """
-    queryset = DeliveryRequest.objects.all()
+    queryset = DeliveryRequest.objects.all().order_by('-id')
     serializer_class = DeliveryRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -458,7 +458,7 @@ class DeliveryRequestUpdateView(generics.UpdateAPIView):
     - Only accessible to authenticated users with 'change_deliveryrequest' permission.
     - Automatically sets 'delivered' to True in RiderDelivery when status is updated to 'Completed'.
     """
-    queryset = DeliveryRequest.objects.all()
+    queryset = DeliveryRequest.objects.all().order_by('-id')
     serializer_class = DeliveryRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -541,7 +541,7 @@ class RiderDeliveryListView(generics.ListAPIView):
     API view to list all Rider Deliveries.
     - Accessible only to authenticated users with 'view_riderdelivery' permission.
     """
-    queryset = RiderDelivery.objects.all().order_by('-last_assigned_at')
+    queryset = RiderDelivery.objects.all().order_by('-id')
     serializer_class = RiderDeliverySerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -559,7 +559,7 @@ class AddRiderDeliveryView(generics.CreateAPIView):
     - Accessible only to authenticated users with appropriate permissions.
     - Automatically updates the delivery request status to "In Progress" upon assignment.
     """
-    queryset = RiderDelivery.objects.all()
+    queryset = RiderDelivery.objects.all().order_by('-id')
     serializer_class = RiderDeliverySerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -621,7 +621,7 @@ class RiderDeliveryDetailView(generics.RetrieveAPIView):
     API view to retrieve details of a RiderDelivery by its ID.
     - Accessible only to authenticated users with the appropriate permission.
     """
-    queryset = RiderDelivery.objects.all()
+    queryset = RiderDelivery.objects.all().order_by('-id')
     serializer_class = RiderDeliverySerializer
     permission_classes = [permissions.IsAuthenticated]
 
