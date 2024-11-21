@@ -104,6 +104,26 @@ class UpdateUserView(generics.UpdateAPIView):
             "message": "Account updated successfully."
         }, status=status.HTTP_200_OK)
 
+class RiderLoginView(APIView):
+    """
+    API view to handle rider login using their unique code.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, format=None):
+        serializer = RiderLoginSerializer(data=request.data)
+        if serializer.is_valid():
+            token = serializer.save()
+            rider = serializer.context['rider']
+            return Response({
+                'token': token.key,
+                'rider_id': rider.id,
+                'name': rider.name,
+                'phone_number': rider.phone_number,
+                'code': rider.code,
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 class RiderListView(generics.ListAPIView):
     """
     API view to list all Riders.
