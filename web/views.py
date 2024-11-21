@@ -113,9 +113,7 @@ class RiderCodeSearchView(APIView):
     def post(self, request, format=None):
         serializer = RiderCodeSearchSerializer(data=request.data)
         if serializer.is_valid():
-            rider = serializer.context['rider']
-            rider_serializer = RiderSerializer(rider)
-            return Response(rider_serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class RiderListView(generics.ListAPIView):

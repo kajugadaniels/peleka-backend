@@ -32,7 +32,20 @@ class UserSerializer(serializers.ModelSerializer):
         return user
 
 class RiderCodeSearchSerializer(serializers.Serializer):
+    # Rider fields
+    id = serializers.IntegerField(read_only=True)
+    name = serializers.CharField(read_only=True)
+    phone_number = serializers.CharField(read_only=True)
+    address = serializers.CharField(read_only=True)
     code = serializers.CharField(required=True, help_text='The unique code of the rider')
+    nid = serializers.CharField(read_only=True)
+    image = serializers.ImageField(read_only=True)
+    permit_image = serializers.ImageField(read_only=True)
+    plate_number = serializers.CharField(read_only=True)
+    insurance = serializers.CharField(read_only=True)
+    
+    # Delivery history field
+    delivery_history = serializers.SerializerMethodField()
 
     def validate_code(self, value):
         try:
@@ -42,6 +55,46 @@ class RiderCodeSearchSerializer(serializers.Serializer):
         
         self.context['rider'] = rider
         return value
+
+    def get_delivery_history(self, obj):
+        """
+        Retrieve the delivery history for the rider.
+        """
+        # Get the rider from the context that was set during validation
+        rider = self.context.get('rider')
+        
+        if rider:
+            # Serialize the delivery history
+            delivery_queryset = rider.rider_delivery.all()
+            return RiderDeliverySerializer(delivery_queryset, many=True).data
+        
+        return []
+
+    def to_representation(self, instance):
+        """
+        Override to_representation to include all rider details and delivery history.
+        """
+        rider = self.context.get('rider')
+        
+        if not rider:
+            return {}
+        
+        # Manually construct the representation with all required fields
+        representation = {
+            'id': rider.id,
+            'name': rider.name,
+            'phone_number': rider.phone_number,
+            'address': rider.address,
+            'code': rider.code,
+            'nid': rider.nid,
+            'image': rider.image.url if rider.image else None,
+            'permit_image': rider.permit_image.url if rider.permit_image else None,
+            'plate_number': rider.plate_number,
+            'insurance': rider.insurance,
+            'delivery_history': self.get_delivery_history(instance)
+        }
+        
+        return representation
 
 class UserDeliveryRequestSerializer(serializers.ModelSerializer):
     client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the request')
