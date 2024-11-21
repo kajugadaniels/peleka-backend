@@ -11,7 +11,7 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
     path('profile-update/', UpdateUserView.as_view(), name='update'),
 
-    path('riders/login/', RiderLoginView.as_view(), name='rider-login'),
+    path('riders/login/', RiderCodeSearchView.as_view(), name='rider-login'),
     path('riders/', RiderListView.as_view(), name='getRiders'),
     path('rider/<int:pk>/', RiderDetailView.as_view(), name='getRiderDetails'),
 
