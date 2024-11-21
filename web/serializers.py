@@ -40,9 +40,7 @@ class RiderLoginSerializer(serializers.Serializer):
         except Rider.DoesNotExist:
             raise serializers.ValidationError("Invalid code. Please check and try again.")
         
-        if not rider.is_active:
-            raise serializers.ValidationError("This rider account is inactive.")
-        
+        # Removed the is_active check
         self.context['rider'] = rider
         return value
 
