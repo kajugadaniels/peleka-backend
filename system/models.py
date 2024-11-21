@@ -8,14 +8,28 @@ from imagekit.processors import ResizeToFill
 
 def rider_image_path(instance, filename):
     base_filename, file_extension = os.path.splitext(filename)
-    return f'riders/rider_{slugify(instance.name)}_{instance.phone_number}_{instance.code}{file_extension}'
+    return f'riders/rider_{slugify(instance.name)}_{instance.phone_number}_{instance.plate_number}_{instance.code}{file_extension}'
+
+def rider_permit_image_path(instance, filename):
+    base_filename, file_extension = os.path.splitext(filename)
+    return f'riders/permits/rider_{slugify(instance.name)}_{instance.plate_number}_{instance.phone_number}_{instance.code}{file_extension}'
 
 class Rider(models.Model):
     name = models.CharField(max_length=100, null=True, blank=True)
     phone_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
-    address = models.CharField(max_length=20, null=True, blank=True)
+    address = models.CharField(max_length=255, null=True, blank=True)
     code = models.CharField(max_length=20, unique=True, null=True, blank=True)
     nid = models.CharField(max_length=20, unique=True, null=True, blank=True)
+    plate_number = models.CharField(max_length=255, null=True, blank=True)
+    permit_image = ProcessedImageField(
+        upload_to=rider_permit_image_path,
+        processors=[ResizeToFill(1270, 1270)],
+        format='JPEG',
+        options={'quality': 90},
+        null=True,
+        blank=True
+    )
+    insurance = models.CharField(max_length=255, null=True, blank=True)
     image = ProcessedImageField(
         upload_to=rider_image_path,
         processors=[ResizeToFill(1270, 1270)],
