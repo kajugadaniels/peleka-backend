@@ -1,5 +1,6 @@
 from system.models import *
 from rest_framework import serializers
+from rest_framework.authtoken.models import Token
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
@@ -29,6 +30,26 @@ class UserSerializer(serializers.ModelSerializer):
             user.set_password(password)
         user.save()
         return user
+
+class RiderLoginSerializer(serializers.Serializer):
+    code = serializers.CharField(write_only=True, required=True, help_text='The unique code of the rider')
+
+    def validate_code(self, value):
+        try:
+            rider = Rider.objects.get(code=value)
+        except Rider.DoesNotExist:
+            raise serializers.ValidationError("Invalid code. Please check and try again.")
+        
+        if not rider.is_active:
+            raise serializers.ValidationError("This rider account is inactive.")
+        
+        self.context['rider'] = rider
+        return value
+
+    def create(self, validated_data):
+        rider = self.context['rider']
+        token, created = Token.objects.get_or_create(user=rider)
+        return token
 
 class UserDeliveryRequestSerializer(serializers.ModelSerializer):
     client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the request')
