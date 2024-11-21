@@ -83,7 +83,10 @@ class RiderCodeSearchSerializer(serializers.Serializer):
         # Function to build absolute URL if image exists
         def build_absolute_url(image_field):
             if image_field and hasattr(image_field, 'url'):
-                return request.build_absolute_uri(image_field.url)
+                if request:
+                    return request.build_absolute_uri(image_field.url)
+                else:
+                    return image_field.url  # Fallback to relative URL if request is None
             return None
 
         # Manually construct the representation with all required fields
