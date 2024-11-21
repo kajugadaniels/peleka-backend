@@ -139,12 +139,13 @@ class RiderSerializer(serializers.ModelSerializer):
     Also includes delivery history with detailed information.
     """
     image = serializers.ImageField(required=False)
+    permit_image = serializers.ImageField(required=False)
     code = serializers.CharField(read_only=True)  # Code is read-only
     delivery_history = RiderDeliverySerializer(source='rider_delivery', many=True, read_only=True, help_text='The delivery history of the rider')
 
     class Meta:
         model = Rider
-        fields = ['id', 'name', 'phone_number', 'address', 'code', 'nid', 'image', 'delivery_history']
+        fields = ['id', 'name', 'phone_number', 'address', 'code', 'nid', 'image', 'permit_image', 'plate_number', 'insurance', 'delivery_history']
         read_only_fields = ['code', 'delivery_history']
 
     def generate_unique_code(self, name):
