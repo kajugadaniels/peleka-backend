@@ -60,13 +60,12 @@ class RiderCodeSearchSerializer(serializers.Serializer):
         """
         Retrieve the delivery history for the rider.
         """
-        # Get the rider from the context that was set during validation
         rider = self.context.get('rider')
         
         if rider:
-            # Serialize the delivery history
             delivery_queryset = rider.rider_delivery.all()
-            return RiderDeliverySerializer(delivery_queryset, many=True).data
+            # Pass the current context to the nested serializer
+            return RiderDeliverySerializer(delivery_queryset, many=True, context=self.context).data
         
         return []
 
