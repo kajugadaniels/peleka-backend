@@ -75,10 +75,17 @@ class RiderCodeSearchSerializer(serializers.Serializer):
         Override to_representation to include all rider details and delivery history.
         """
         rider = self.context.get('rider')
-        
+        request = self.context.get('request')  # Get the request from context
+
         if not rider:
             return {}
         
+        # Function to build absolute URL if image exists
+        def build_absolute_url(image_field):
+            if image_field and hasattr(image_field, 'url'):
+                return request.build_absolute_uri(image_field.url)
+            return None
+
         # Manually construct the representation with all required fields
         representation = {
             'id': rider.id,
@@ -87,8 +94,8 @@ class RiderCodeSearchSerializer(serializers.Serializer):
             'address': rider.address,
             'code': rider.code,
             'nid': rider.nid,
-            'image': rider.image.url if rider.image else None,
-            'permit_image': rider.permit_image.url if rider.permit_image else None,
+            'image': build_absolute_url(rider.image),
+            'permit_image': build_absolute_url(rider.permit_image),
             'plate_number': rider.plate_number,
             'insurance': rider.insurance,
             'delivery_history': self.get_delivery_history(instance)
