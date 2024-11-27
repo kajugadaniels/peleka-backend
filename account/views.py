@@ -1,3 +1,5 @@
+import logging
+from account.utils import *
 from account.serializers import *
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -7,6 +9,8 @@ from rest_framework.generics import GenericAPIView
 from rest_framework.exceptions import PermissionDenied
 from rest_framework import generics, permissions, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
+
+logger = logging.getLogger(__name__)
 
 class LoginView(GenericAPIView):  # Change to GenericAPIView
     permission_classes = [permissions.AllowAny]
