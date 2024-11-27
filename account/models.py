@@ -32,6 +32,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         blank=True
     )
     password = models.CharField(max_length=255, null=True, blank=True)
+    reset_otp = models.CharField(max_length=7, null=True, blank=True)
+    otp_created_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
 
     is_active = models.BooleanField(default=True)
