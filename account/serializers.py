@@ -1,6 +1,10 @@
+import re
 from account.models import *
+from django.db.models import Q
 from rest_framework import serializers
 from django.contrib.auth.models import Permission
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
@@ -74,3 +78,27 @@ class UserSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email_or_phone = serializers.CharField()
+
+    def validate_email_or_phone(self, value):
+        """
+        Validate that the identifier is either a valid email or phone number and exists in the database.
+        """
+        user_exists = User.objects.filter(Q(email=value) | Q(phone_number=value)).exists()
+        if not user_exists:
+            raise serializers.ValidationError('User with this email or phone number does not exist.')
+
+        # Additional format validation
+        if "@" in value:
+            try:
+                validate_email(value)
+            except ValidationError:
+                raise serializers.ValidationError("Invalid email address.")
+        else:
+            phone_regex = re.compile(r'^\+?1?\d{9,15}$')
+            if not phone_regex.match(value):
+                raise serializers.ValidationError("Invalid phone number format.")
+
+        return value
