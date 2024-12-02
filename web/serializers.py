@@ -1,4 +1,5 @@
 import re
+from web.models import *
 from system.models import *
 from django.db.models import Q
 from datetime import timedelta
@@ -6,6 +7,7 @@ from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
+from django.core.validators import validate_email as is_valid_email
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
@@ -445,3 +447,14 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         user.save()
 
         return user
+
+class ContactUsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactUs
+        fields = ['id', 'name', 'email', 'subject', 'message', 'submitted_at']
+        read_only_fields = ['id', 'submitted_at']
+
+    def validate_email(self, value):
+        if not is_valid_email(value, verify=True):
+            raise serializers.ValidationError("Invalid or non-existent email address.")
+        return value
