@@ -5,7 +5,6 @@ from django.db.models import Q
 from datetime import timedelta
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
-from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from email_validator import validate_email, EmailNotValidError
 
@@ -462,9 +461,9 @@ class ContactUsSerializer(serializers.ModelSerializer):
         try:
             # Validate and normalize the email address
             valid = validate_email(
-                email=value,
+                value,  # Pass as positional argument
                 check_deliverability=True  # This checks MX records
             )
             return valid.email  # Return the normalized email
         except EmailNotValidError as e:
-            raise serializers.ValidationError("Invalid or non-existent email address.")
+            raise serializers.ValidationError("Invalid or non-existent email address.") from e
