@@ -343,3 +343,37 @@ class UserDeleteDeliveryRequestView(generics.DestroyAPIView):
         return Response({
             'message': "Delivery request marked as deleted successfully."
         }, status=status.HTTP_200_OK)
+
+class ContactUsView(APIView):
+    def post(self, request):
+        serializer = ContactUsSerializer(data=request.data)
+        if serializer.is_valid():
+            contact = serializer.save()
+            # Prepare email
+            subject = f"New Contact Us Submission: {contact.subject}"
+            message = f"""
+            You have received a new contact us message.
+
+            Name: {contact.name}
+            Email: {contact.email}
+            Subject: {contact.subject}
+            Message:
+            {contact.message}
+
+            Submitted at: {contact.submitted_at}
+            """
+            from_email = settings.DEFAULT_FROM_EMAIL
+            recipient_list = [settings.CONTACT_EMAIL]
+
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=from_email,
+                    recipient_list=recipient_list,
+                    fail_silently=False,
+                )
+                return Response({"detail": "Your message has been sent successfully."}, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response({"detail": f"Failed to send email: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
