@@ -17,7 +17,7 @@ urlpatterns = [
     path('riders/', RiderListView.as_view(), name='getRiders'),
     path('rider/<int:pk>/', RiderDetailView.as_view(), name='getRiderDetails'),
 
-    path('/contact-us/', ContactUsView.as_view(), name='contactUs'),
+    path('contact-us/', ContactUsView.as_view(), name='contact-us'),
 
     path('delivery-requests/', UserDeliveryRequestListView.as_view(), name='userDeliveryRequestList'),
     path('delivery-request/', UserDeliveryRequestCreateView.as_view(), name='userDeliveryRequestCreate'),

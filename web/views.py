@@ -235,6 +235,8 @@ class RiderDetailView(generics.RetrieveAPIView):
     permission_classes = [AllowAny]
 
 class ContactUsView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
         serializer = ContactUsSerializer(data=request.data)
         if serializer.is_valid():
