@@ -5,9 +5,9 @@ from django.db.models import Q
 from datetime import timedelta
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
+from validate_email import validate_email as is_valid_email
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
-from django.core.validators import validate_email as is_valid_email
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
