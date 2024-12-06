@@ -168,7 +168,11 @@ REST_FRAMEWORK = {
     ],
 }
 
-CSRF_TRUSTED_ORIGINS = ['http://159.89.14.178','https://*.127.0.0.1']
+CSRF_TRUSTED_ORIGINS = [
+    'http://159.89.14.178',
+    'https://www.pelekaap.com',
+    'https://*.127.0.0.1'
+]
 
 CORS_ALLOW_ALL_ORIGINS = True
 
