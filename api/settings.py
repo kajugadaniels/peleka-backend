@@ -168,7 +168,7 @@ REST_FRAMEWORK = {
     ],
 }
 
-CSRF_TRUSTED_ORIGINS = ['https://peleka-api.up.railway.app','https://*.127.0.0.1']
+CSRF_TRUSTED_ORIGINS = ['https://www.pelekaap.com','https://*.127.0.0.1']
 
 CORS_ALLOW_ALL_ORIGINS = True
 
