@@ -536,6 +536,40 @@ class DeleteDeliveryRequestView(generics.DestroyAPIView):
             'data': DeliveryRequestSerializer(delivery_request).data
         }, status=status.HTTP_200_OK)
 
+class CompleteDeliveryRequestView(generics.UpdateAPIView):
+    """
+    API view to mark a DeliveryRequest as Completed.
+    - Accessible to any authenticated user.
+    - Only updates the status to 'Completed'.
+    - If already completed, returns a corresponding message.
+    """
+    queryset = DeliveryRequest.objects.all()
+    serializer_class = DeliveryRequestCompleteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, *args, **kwargs):
+        delivery_request = self.get_object()
+
+        if delivery_request.status == 'Completed':
+            return Response(
+                {'message': 'The delivery request is already completed.'},
+                status=status.HTTP_200_OK
+            )
+
+        # Set status to 'Completed'
+        delivery_request.status = 'Completed'
+        delivery_request.save()
+
+        # Serialize the updated delivery request
+        serializer = DeliveryRequestSerializer(delivery_request)
+        return Response(
+            {
+                'message': 'Delivery request marked as completed successfully.',
+                'data': serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
+
 class RiderDeliveryListView(generics.ListAPIView):
     """
     API view to list all Rider Deliveries.
