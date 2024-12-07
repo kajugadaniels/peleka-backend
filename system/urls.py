@@ -25,6 +25,7 @@ urlpatterns = [
     path('delivery-request/<int:pk>/', DeliveryRequestDetailView.as_view(), name='deliveryRequestDetail'),
     path('delivery-request/update/<int:pk>/', DeliveryRequestUpdateView.as_view(), name='updateDeliveryRequest'),
     path('delivery-request/delete/<int:pk>/', DeleteDeliveryRequestView.as_view(), name='deleteDeliveryRequest'),
+    path('delivery-request/<int:pk>/complete/', CompleteDeliveryRequestView.as_view(), name='completeDeliveryRequest'),
 
     path('rider-deliveries/', RiderDeliveryListView.as_view(), name='riderDeliveryList'),
     path('rider-delivery/', AddRiderDeliveryView.as_view(), name='addRiderDelivery'),
