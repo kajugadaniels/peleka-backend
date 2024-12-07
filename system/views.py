@@ -542,6 +542,8 @@ class CompleteDeliveryRequestView(generics.UpdateAPIView):
     - Accessible to any authenticated user.
     - Only updates the status to 'Completed'.
     - If already completed, returns a corresponding message.
+    - Also updates related RiderDelivery records by setting 'delivered' to True
+      and recording the 'delivered_at' timestamp.
     """
     queryset = DeliveryRequest.objects.all()
     serializer_class = DeliveryRequestCompleteSerializer
@@ -560,12 +562,24 @@ class CompleteDeliveryRequestView(generics.UpdateAPIView):
         delivery_request.status = 'Completed'
         delivery_request.save()
 
+        # Update related RiderDelivery records
+        rider_deliveries = RiderDelivery.objects.filter(
+            delivery_request=delivery_request,
+            delivered=False
+        )
+        updated_count = rider_deliveries.update(
+            delivered=True,
+            delivered_at=timezone.now()
+        )
+
         # Serialize the updated delivery request
         serializer = DeliveryRequestSerializer(delivery_request)
+
         return Response(
             {
                 'message': 'Delivery request marked as completed successfully.',
-                'data': serializer.data
+                'data': serializer.data,
+                'rider_deliveries_updated': updated_count
             },
             status=status.HTTP_200_OK
         )
