@@ -201,3 +201,19 @@ class RiderSerializer(serializers.ModelSerializer):
             # Optionally, omit or include minimal delivery_history for list operations
             representation.pop('delivery_history', None)
         return representation
+
+class DeliveryRequestCompleteSerializer(serializers.ModelSerializer):
+    """
+    Serializer for marking a DeliveryRequest as Completed.
+    Only allows the status to be set to 'Completed'.
+    """
+
+    class Meta:
+        model = DeliveryRequest
+        fields = ['status']
+        read_only_fields = ['status']
+
+    def validate(self, attrs):
+        if attrs.get('status') != 'Completed':
+            raise serializers.ValidationError("Status can only be updated to 'Completed'.")
+        return attrs
