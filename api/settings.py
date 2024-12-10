@@ -169,7 +169,7 @@ REST_FRAMEWORK = {
 }
 
 CSRF_TRUSTED_ORIGINS = [
-    'http://159.89.14.178',
+    'https://www.api.pelekaap.com/',
     'https://www.pelekaap.com',
     'https://*.127.0.0.1'
 ]
