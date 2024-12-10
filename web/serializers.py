@@ -9,8 +9,33 @@ from django.core.exceptions import ValidationError
 from email_validator import validate_email, EmailNotValidError
 
 class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
+    email_or_phone = serializers.CharField(required=True, write_only=True)
     password = serializers.CharField(write_only=True, required=True)
+    
+    def validate_email_or_phone(self, value):
+        """
+        Validate that the input is either a valid email or a valid phone number.
+        """
+        # Check if it's an email
+        if "@" in value:
+            try:
+                validate_email(value)
+            except ValidationError as e:
+                raise serializers.ValidationError("Invalid email address.") from e
+        else:
+            # Validate phone number (simple regex for demonstration)
+            phone_regex = re.compile(r'^\+?1?\d{9,15}$')
+            if not phone_regex.match(value):
+                raise serializers.ValidationError("Invalid phone number format.")
+        return value
+
+    def validate_password(self, value):
+        """
+        Add password validations if needed (e.g., minimum length).
+        """
+        if len(value) < 8:
+            raise serializers.ValidationError("Password must be at least 8 characters long.")
+        return value
 
 class UserSerializer(serializers.ModelSerializer):
     role_name = serializers.CharField(source='role.name', read_only=True)
