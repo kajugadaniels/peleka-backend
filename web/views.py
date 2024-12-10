@@ -15,30 +15,50 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 
 logger = logging.getLogger(__name__)
 
-class LoginView(GenericAPIView):  # Change to GenericAPIView
+class LoginView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = LoginSerializer
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        email = serializer.validated_data['email']
+        if not serializer.is_valid():
+            # Log the serializer errors
+            logger.warning(f"Login failed due to serializer errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        email_or_phone = serializer.validated_data['email_or_phone']
         password = serializer.validated_data['password']
 
-        user = authenticate(username=email, password=password)
+        # Determine if the identifier is an email or phone number
+        user = None
+        if "@" in email_or_phone:
+            user = authenticate(username=email_or_phone, password=password)
+            if not user:
+                logger.warning(f"Login failed for email: {email_or_phone}")
+        else:
+            try:
+                user = User.objects.get(phone_number=email_or_phone)
+                if not user.check_password(password):
+                    user = None
+                    logger.warning(f"Login failed for phone number: {email_or_phone} due to incorrect password.")
+            except User.DoesNotExist:
+                logger.warning(f"Login failed: No user found with phone number: {email_or_phone}")
 
         if user:
             # Delete old token and generate a new one
             Token.objects.filter(user=user).delete()
             token, created = Token.objects.get_or_create(user=user)
 
+            logger.info(f"User {user.email or user.phone_number} logged in successfully.")
+
             return Response({
                 'token': token.key,
                 'user': UserSerializer(user).data,
                 'message': 'Login successful.'
             }, status=status.HTTP_200_OK)
-        return Response({'error': 'Invalid email or password.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # For security, do not specify if it's the identifier or password that's wrong
+        return Response({'error': 'Invalid credentials.'}, status=status.HTTP_400_BAD_REQUEST)
 
 class PasswordResetRequestView(generics.GenericAPIView):
     serializer_class = PasswordResetRequestSerializer
