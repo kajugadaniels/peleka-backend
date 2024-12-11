@@ -43,19 +43,19 @@ class UserAdmin(ReadOnlyAdmin, BaseUserAdmin):
     readonly_fields = ('last_login', 'created_at', 'otp_created_at')
     list_select_related = ('role',)
 
-@admin.register(RequestDemo)
-class RequestDemoAdmin(ReadOnlyAdmin):
-    list_display = ('id', 'name', 'company_name', 'contact_number', 'email')
-    search_fields = ('name', 'company_name', 'contact_number', 'email')
-    ordering = ('id',)
+# @admin.register(RequestDemo)
+# class RequestDemoAdmin(ReadOnlyAdmin):
+#     list_display = ('id', 'name', 'company_name', 'contact_number', 'email')
+#     search_fields = ('name', 'company_name', 'contact_number', 'email')
+#     ordering = ('id',)
 
-@admin.register(ContactUs)
-class ContactUsAdmin(ReadOnlyAdmin):
-    list_display = ('id', 'name', 'email', 'subject', 'submitted_at')
-    search_fields = ('name', 'email', 'subject', 'message')
-    list_filter = ('submitted_at',)
-    ordering = ('-submitted_at',)
-    readonly_fields = ('submitted_at',)
+# @admin.register(ContactUs)
+# class ContactUsAdmin(ReadOnlyAdmin):
+#     list_display = ('id', 'name', 'email', 'subject', 'submitted_at')
+#     search_fields = ('name', 'email', 'subject', 'message')
+#     list_filter = ('submitted_at',)
+#     ordering = ('-submitted_at',)
+#     readonly_fields = ('submitted_at',)
 
 @admin.register(Rider)
 class RiderAdmin(ReadOnlyAdmin):
