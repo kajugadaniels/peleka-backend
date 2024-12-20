@@ -7,8 +7,8 @@ from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import PermissionDenied
-from rest_framework import generics, permissions, status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework import generics, permissions, status
 
 class RoleListCreateView(generics.ListCreateAPIView):
     """
@@ -696,36 +696,3 @@ class RiderDeliveryDetailView(generics.RetrieveAPIView):
         """
         # Call the default retrieve method without modifying the response structure
         return self.retrieve(request, *args, **kwargs)
-
-class SetRiderDeliveryInProgressView(APIView):
-    """
-    API view to set the 'in_progress_at' field of a RiderDelivery to the current time.
-    - Accessible only to authenticated users with 'change_riderdelivery' permission.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request, pk, *args, **kwargs):
-        """
-        Set 'in_progress_at' for the RiderDelivery with the given pk.
-        """
-        # Check if the user has permission to change rider deliveries
-        if not request.user.is_superuser and not request.user.has_perm('system.change_riderdelivery'):
-            raise PermissionDenied({'message': "You do not have permission to update rider deliveries."})
-
-        # Retrieve the RiderDelivery instance
-        try:
-            rider_delivery = RiderDelivery.objects.get(pk=pk)
-        except RiderDelivery.DoesNotExist:
-            raise NotFound({'message': "RiderDelivery not found."})
-
-        # Update the 'in_progress_at' field to the current time
-        rider_delivery.in_progress_at = timezone.now()
-        rider_delivery.save()
-
-        # Serialize the updated RiderDelivery instance
-        serializer = RiderDeliverySerializer(rider_delivery, context={'request': request})
-
-        return Response({
-            'message': "'in_progress_at' set successfully.",
-            'data': serializer.data
-        }, status=200)

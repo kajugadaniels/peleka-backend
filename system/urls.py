@@ -29,6 +29,5 @@ urlpatterns = [
 
     path('rider-deliveries/', RiderDeliveryListView.as_view(), name='riderDeliveryList'),
     path('rider-delivery/', AddRiderDeliveryView.as_view(), name='addRiderDelivery'),
-    path('rider-delivery/<int:pk>/', RiderDeliveryDetailView.as_view(), name='riderDeliveryDetail'),
-    path('rider-delivery/<int:pk>/set-in-progress/', SetRiderDeliveryInProgressView.as_view(), name='setRiderDeliveryInProgress'),
+    path('rider-delivery/<int:pk>/', RiderDeliveryDetailView.as_view(), name='riderDeliveryDetail')
 ]  + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

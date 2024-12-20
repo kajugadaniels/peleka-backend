@@ -24,4 +24,6 @@ urlpatterns = [
     path('delivery-request/<int:pk>/', UserDeliveryRequestDetailView.as_view(), name='userDeliveryRequestDetail'),
     path('delivery-request/update/<int:pk>/', UserDeliveryRequestUpdateView.as_view(), name='userDeliveryRequestUpdate'),
     path('delivery-request/delete/<int:pk>/', UserDeleteDeliveryRequestView.as_view(), name='userDeliveryRequestDelete'),
+
+    path('rider-delivery/<int:pk>/set-in-progress/', SetRiderDeliveryInProgressView.as_view(), name='setRiderDeliveryInProgress'),
 ]  + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
