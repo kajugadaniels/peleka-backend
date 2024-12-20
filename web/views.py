@@ -2,7 +2,6 @@ import logging
 from web.utils import *
 from system.models import *
 from web.serializers import *
-from web.serializers import *
 from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
