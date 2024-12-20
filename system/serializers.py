@@ -148,7 +148,7 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         # Update the delivery request status
         delivery_request = validated_data.get('delivery_request')
         if delivery_request:
-            delivery_request.status = 'Pending'
+            delivery_request.status = 'Accepted'
             delivery_request.save()
 
         return super().create(validated_data)
