@@ -646,7 +646,7 @@ class AddRiderDeliveryView(generics.CreateAPIView):
             delivery_request=delivery_request,
             delivered=False,
             assigned_at=timezone.now(),
-            in_progress_at=timezone.now(),
+            # in_progress_at=timezone.now(),
             last_assigned_at=timezone.now()
         )
 
