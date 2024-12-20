@@ -401,17 +401,17 @@ class UserDeleteDeliveryRequestView(generics.DestroyAPIView):
 
 class SetRiderDeliveryInProgressView(APIView):
     """
-    API view to set the 'in_progress_at' field of a RiderDelivery to the current time.
+    API view to set the 'in_progress_at' field of a RiderDelivery to the current time
+    and update the related DeliveryRequest status to 'In Progress'.
     - Accessible to any user without authentication or specific permissions.
     """
     permission_classes = [AllowAny]
 
     def post(self, request, pk, *args, **kwargs):
         """
-        Set 'in_progress_at' for the RiderDelivery with the given pk.
+        Set 'in_progress_at' for the RiderDelivery with the given pk and update
+        the related DeliveryRequest status to 'In Progress'.
         """
-        # No permission checks needed since access is open to any user
-
         # Retrieve the RiderDelivery instance
         try:
             rider_delivery = RiderDelivery.objects.get(pk=pk)
@@ -422,10 +422,16 @@ class SetRiderDeliveryInProgressView(APIView):
         rider_delivery.in_progress_at = timezone.now()
         rider_delivery.save()
 
+        # Update the related DeliveryRequest status to 'In Progress'
+        delivery_request = rider_delivery.delivery_request
+        if delivery_request:
+            delivery_request.status = 'In Progress'
+            delivery_request.save()
+
         # Serialize the updated RiderDelivery instance
         serializer = RiderDeliverySerializer(rider_delivery, context={'request': request})
 
         return Response({
-            'message': "'in_progress_at' set successfully.",
+            'message': "'in_progress_at' set successfully and delivery request status updated to 'In Progress'.",
             'data': serializer.data
         }, status=200)
