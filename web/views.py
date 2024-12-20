@@ -414,12 +414,12 @@ class SetRiderDeliveryInProgressView(APIView):
         Set 'in_progress_at' for the RiderDelivery with the given pk and update
         the related DeliveryRequest status to 'In Progress' with validations:
         
-        - DeliveryRequest.status must be 'Pending' to update to 'In Progress'.
+        - DeliveryRequest.status must be 'Pending' or 'Accepted' to update to 'In Progress'.
         - If DeliveryRequest.status is 'Completed', do not allow update.
         - RiderDelivery.delivered must be False to allow updating.
-        - If RiderDelivery.in_progress_at is already set and delivered is True, do not allow update.
+        - If RiderDelivery.in_progress_at is already set, do not allow update.
         """
-        # Retrieve the RiderDelivery instance
+        # Retrieve the RiderDelivery instance along with the related DeliveryRequest
         try:
             rider_delivery = RiderDelivery.objects.select_related('delivery_request').get(pk=pk)
         except RiderDelivery.DoesNotExist:
@@ -427,10 +427,14 @@ class SetRiderDeliveryInProgressView(APIView):
 
         delivery_request = rider_delivery.delivery_request
 
+        # Validate if DeliveryRequest exists
+        if not delivery_request:
+            raise ValidationError({'message': "Associated DeliveryRequest does not exist."})
+
         # Validate DeliveryRequest status
         if delivery_request.status == 'Completed':
             raise ValidationError({'message': "The delivery has already been completed and cannot be updated."})
-        elif delivery_request.status != 'Pending':
+        elif delivery_request.status not in ['Pending', 'Accepted']:
             raise ValidationError({'message': f"Cannot update delivery request status from '{delivery_request.status}' to 'In Progress'."})
 
         # Validate RiderDelivery fields
