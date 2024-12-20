@@ -402,17 +402,15 @@ class UserDeleteDeliveryRequestView(generics.DestroyAPIView):
 class SetRiderDeliveryInProgressView(APIView):
     """
     API view to set the 'in_progress_at' field of a RiderDelivery to the current time.
-    - Accessible only to authenticated users with 'change_riderdelivery' permission.
+    - Accessible to any user without authentication or specific permissions.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request, pk, *args, **kwargs):
         """
         Set 'in_progress_at' for the RiderDelivery with the given pk.
         """
-        # Check if the user has permission to change rider deliveries
-        if not request.user.is_superuser and not request.user.has_perm('system.change_riderdelivery'):
-            raise PermissionDenied({'message': "You do not have permission to update rider deliveries."})
+        # No permission checks needed since access is open to any user
 
         # Retrieve the RiderDelivery instance
         try:
