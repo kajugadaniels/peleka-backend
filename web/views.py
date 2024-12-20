@@ -3,6 +3,7 @@ from web.utils import *
 from system.models import *
 from web.serializers import *
 from django.db.models import Q
+from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
@@ -405,28 +406,47 @@ class SetRiderDeliveryInProgressView(APIView):
     and update the related DeliveryRequest status to 'In Progress'.
     - Accessible to any user without authentication or specific permissions.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [AllowAny]  # Allow access to any user
 
+    @transaction.atomic
     def post(self, request, pk, *args, **kwargs):
         """
         Set 'in_progress_at' for the RiderDelivery with the given pk and update
-        the related DeliveryRequest status to 'In Progress'.
+        the related DeliveryRequest status to 'In Progress' with validations:
+        
+        - DeliveryRequest.status must be 'Pending' to update to 'In Progress'.
+        - If DeliveryRequest.status is 'Completed', do not allow update.
+        - RiderDelivery.delivered must be False to allow updating.
+        - If RiderDelivery.in_progress_at is already set and delivered is True, do not allow update.
         """
         # Retrieve the RiderDelivery instance
         try:
-            rider_delivery = RiderDelivery.objects.get(pk=pk)
+            rider_delivery = RiderDelivery.objects.select_related('delivery_request').get(pk=pk)
         except RiderDelivery.DoesNotExist:
             raise NotFound({'message': "RiderDelivery not found."})
+
+        delivery_request = rider_delivery.delivery_request
+
+        # Validate DeliveryRequest status
+        if delivery_request.status == 'Completed':
+            raise ValidationError({'message': "The delivery has already been completed and cannot be updated."})
+        elif delivery_request.status != 'Pending':
+            raise ValidationError({'message': f"Cannot update delivery request status from '{delivery_request.status}' to 'In Progress'."})
+
+        # Validate RiderDelivery fields
+        if rider_delivery.delivered:
+            raise ValidationError({'message': "Cannot update 'in_progress_at' because the delivery has already been completed."})
+        
+        if rider_delivery.in_progress_at:
+            raise ValidationError({'message': "'in_progress_at' has already been set and cannot be updated again."})
 
         # Update the 'in_progress_at' field to the current time
         rider_delivery.in_progress_at = timezone.now()
         rider_delivery.save()
 
         # Update the related DeliveryRequest status to 'In Progress'
-        delivery_request = rider_delivery.delivery_request
-        if delivery_request:
-            delivery_request.status = 'In Progress'
-            delivery_request.save()
+        delivery_request.status = 'In Progress'
+        delivery_request.save()
 
         # Serialize the updated RiderDelivery instance
         serializer = RiderDeliverySerializer(rider_delivery, context={'request': request})
