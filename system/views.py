@@ -651,7 +651,7 @@ class AddRiderDeliveryView(generics.CreateAPIView):
         )
 
         # Update the delivery request status
-        delivery_request.status = 'In Progress'
+        delivery_request.status = 'Pending'
         delivery_request.save()
 
         serializer = self.get_serializer(rider_delivery)

@@ -143,12 +143,12 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         """Create a new RiderDelivery instance with assigned_at and in_progress_at set to current time."""
         validated_data['delivered'] = False
         validated_data['assigned_at'] = timezone.now()
-        validated_data['in_progress_at'] = timezone.now()
+        # validated_data['in_progress_at'] = timezone.now()
 
         # Update the delivery request status
         delivery_request = validated_data.get('delivery_request')
         if delivery_request:
-            delivery_request.status = 'In Progress'
+            delivery_request.status = 'Pending'
             delivery_request.save()
 
         return super().create(validated_data)
