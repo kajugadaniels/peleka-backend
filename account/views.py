@@ -8,14 +8,20 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework import generics, permissions, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 
-class LoginView(GenericAPIView):  # Change to GenericAPIView
+class LoginView(GenericAPIView):
     permission_classes = [permissions.AllowAny]
-    serializer_class = LoginSerializer  # Ensure serializer is set
+    serializer_class = LoginSerializer
 
     def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)  # Use get_serializer method
-        serializer.is_valid(raise_exception=True)
-        
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except serializers.ValidationError as e:
+            return Response({
+                'error': 'Login failed due to invalid input.',
+                'details': e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         email = serializer.validated_data['email']
         password = serializer.validated_data['password']
 
@@ -28,10 +34,21 @@ class LoginView(GenericAPIView):  # Change to GenericAPIView
 
             return Response({
                 'token': token.key,
-                'user': UserSerializer(user).data,  # Use your user serializer if needed
-                'message': 'Login successful.'
+                'user': UserSerializer(user, context={'request': request}).data,
+                'message': f'Login successful. Welcome back, {user.name}!'
             }, status=status.HTTP_200_OK)
-        return Response({'error': 'Invalid email or password.'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # Check if user exists
+            user_exists = User.objects.filter(email=email).exists()
+            if not user_exists:
+                error_detail = 'No account found with the provided email.'
+            else:
+                error_detail = 'Incorrect password. Please try again.'
+
+            return Response({
+                'error': 'Authentication failed.',
+                'details': error_detail
+            }, status=status.HTTP_401_UNAUTHORIZED)
 
 class RegisterView(generics.CreateAPIView):
     """
