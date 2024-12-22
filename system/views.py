@@ -322,41 +322,66 @@ class UserDetailView(APIView):
     def get(self, request, user_id):
         user = self.get_object(user_id)
         if user is None:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-        
+            return Response({
+                'error': f"User with ID {user_id} not found."
+            }, status=status.HTTP_404_NOT_FOUND)
+
         # Only superusers or users with 'view_user' permission can view user details
         if not request.user.is_superuser and not request.user.has_perm('account.view_user'):
-            return Response({"error": "You do not have permission to view this user."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({
+                "error": "Access denied. You do not have the necessary permissions to view this user's details."
+            }, status=status.HTTP_403_FORBIDDEN)
 
-        serializer = UserSerializer(user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        serializer = UserSerializer(user, context={'request': request})
+        return Response({
+            'message': f"User '{user.name}' retrieved successfully.",
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
 
     def put(self, request, user_id):
         user = self.get_object(user_id)
         if user is None:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                'error': f"User with ID {user_id} not found."
+            }, status=status.HTTP_404_NOT_FOUND)
 
         # Only superusers or users with 'change_user' permission can update user details
         if not request.user.is_superuser and not request.user.has_perm('account.change_user'):
-            return Response({"error": "You do not have permission to edit this user."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({
+                "error": "Access denied. You do not have the necessary permissions to update this user's details."
+            }, status=status.HTTP_403_FORBIDDEN)
 
-        serializer = UserSerializer(user, data=request.data)
-        if serializer.is_valid():
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        try:
+            serializer.is_valid(raise_exception=True)
             serializer.save()
-            return Response({"message": "User updated successfully", "user": serializer.data}, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                "message": f"User '{user.name}' updated successfully.",
+                "user": serializer.data
+            }, status=status.HTTP_200_OK)
+        except serializers.ValidationError as e:
+            return Response({
+                "error": "User update failed due to invalid input.",
+                "details": e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, user_id):
         user = self.get_object(user_id)
         if user is None:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                'error': f"User with ID {user_id} not found."
+            }, status=status.HTTP_404_NOT_FOUND)
 
         # Only superusers or users with 'delete_user' permission can delete users
         if not request.user.is_superuser and not request.user.has_perm('account.delete_user'):
-            return Response({"error": "You do not have permission to delete this user."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({
+                "error": "Access denied. You do not have the necessary permissions to delete this user."
+            }, status=status.HTTP_403_FORBIDDEN)
 
         user.delete()
-        return Response({"message": "User deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+        return Response({
+            "message": f"User '{user.name}' deleted successfully."
+        }, status=status.HTTP_204_NO_CONTENT)
 
 class RiderListCreateView(generics.ListCreateAPIView):
     """
