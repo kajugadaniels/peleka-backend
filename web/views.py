@@ -284,6 +284,14 @@ class RiderListView(generics.ListAPIView):
     serializer_class = RiderSerializer
     permission_classes = [AllowAny]
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True, context={'request': request})
+        return Response({
+            'message': 'Riders retrieved successfully.',
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+
 class RiderDetailView(generics.RetrieveAPIView):
     """
     API view to retrieve Rider details.
