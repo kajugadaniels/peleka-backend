@@ -397,11 +397,23 @@ class UserDeliveryRequestCreateView(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        # Automatically set the client as the logged-in user
-        serializer.save(client=self.request.user, status="Pending")
+        # Automatically set the client as the logged-in user and status to "Pending"
+        return serializer.save(client=self.request.user, status="Pending")
 
     def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+            delivery_request = self.perform_create(serializer)
+            return Response({
+                'message': 'Delivery request created successfully.',
+                'data': UserDeliveryRequestSerializer(delivery_request, context={'request': request}).data
+            }, status=status.HTTP_201_CREATED)
+        except serializers.ValidationError as e:
+            return Response({
+                'error': 'Delivery request creation failed due to invalid input.',
+                'details': e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 class UserDeliveryRequestDetailView(generics.RetrieveAPIView):
     """
