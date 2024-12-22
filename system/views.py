@@ -554,15 +554,23 @@ class DeliveryRequestDetailView(generics.RetrieveAPIView):
         - If not found, raise a NotFound exception.
         """
         # Check if the user has the 'view_deliveryrequest' permission
-        if not self.request.user.has_perm('system.view_deliveryrequest'):
-            raise PermissionDenied({'message': "You do not have permission to view this delivery request."})
+        if not self.request.user.has_perm('system.view_deliveryrequest') and not self.request.user.is_superuser:
+            raise PermissionDenied({'error': "You do not have the necessary permissions to view this delivery request."})
 
         try:
             # Fetch the delivery request object by its primary key (ID)
             return DeliveryRequest.objects.get(pk=self.kwargs['pk'])
         except DeliveryRequest.DoesNotExist:
             # Raise a NotFound exception if the object does not exist
-            raise NotFound({'message': "Delivery request not found."})
+            raise NotFound({'error': f"Delivery request with ID {self.kwargs['pk']} not found."})
+
+    def get(self, request, *args, **kwargs):
+        delivery_request = self.get_object()
+        serializer = self.get_serializer(delivery_request, context={'request': request})
+        return Response({
+            'message': f"Delivery request ID {delivery_request.id} retrieved successfully.",
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
 
 class DeliveryRequestUpdateView(generics.UpdateAPIView):
     """
