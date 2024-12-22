@@ -159,17 +159,29 @@ class AssignPermissionView(APIView):
     def post(self, request, *args, **kwargs):
         # Superusers can bypass the permission check
         if not request.user.is_superuser and not request.user.has_perm('auth.change_user'):
-            raise PermissionDenied({'message': "You do not have permission to assign permissions."})
+            raise PermissionDenied({'error': "You do not have the necessary permissions to assign permissions."})
 
         user_id = request.data.get('user_id')
         permission_codenames = request.data.get('permission_codename', [])
         response_data = []
 
+        # Validate user_id
+        if not user_id:
+            return Response({
+                'error': 'User ID is required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate permission_codenames
+        if not permission_codenames:
+            return Response({
+                'error': 'At least one permission codename must be provided.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         # Check if user exists
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
-            return Response({'message': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': f'User with ID {user_id} does not exist.'}, status=status.HTTP_404_NOT_FOUND)
 
         # Assign each permission if the user doesn't already have it
         for codename in permission_codenames:
@@ -179,11 +191,14 @@ class AssignPermissionView(APIView):
                     response_data.append({'codename': codename, 'status': f'User already has the "{codename}" permission.'})
                 else:
                     user.user_permissions.add(permission)
-                    response_data.append({'codename': codename, 'status': 'Permission assigned successfully.'})
+                    response_data.append({'codename': codename, 'status': f'Permission "{codename}" assigned successfully.'})
             except Permission.DoesNotExist:
-                response_data.append({'codename': codename, 'status': 'Permission not found.'})
+                response_data.append({'codename': codename, 'status': f'Permission "{codename}" does not exist.'})
 
-        return Response({'results': response_data}, status=status.HTTP_200_OK)
+        return Response({
+            'message': 'Permissions assignment process completed.',
+            'results': response_data
+        }, status=status.HTTP_200_OK)
 
 class RemovePermissionView(APIView):
     """
