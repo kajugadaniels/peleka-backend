@@ -257,13 +257,13 @@ class UserPermissionsView(APIView):
 
     def get(self, request, user_id, *args, **kwargs):
         if not request.user.is_superuser and not request.user.has_perm('auth.view_permission'):
-            raise PermissionDenied({'message': "You do not have permission to view this user's permissions."})
+            raise PermissionDenied({'error': "You do not have the necessary permissions to view this user's permissions."})
 
         # Check if the user exists
         try:
             user = User.objects.get(pk=user_id)
         except User.DoesNotExist:
-            return Response({'message': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': f'User with ID {user_id} does not exist.'}, status=status.HTTP_404_NOT_FOUND)
 
         # Retrieve direct and group permissions
         user_permissions = user.user_permissions.all() | Permission.objects.filter(group__user=user)
@@ -275,7 +275,7 @@ class UserPermissionsView(APIView):
         } for perm in user_permissions.distinct()]
 
         return Response({
-            'message': 'Permissions retrieved successfully.',
+            'message': f"Permissions for user '{user.name}' retrieved successfully.",
             'permissions': permissions_data
         }, status=status.HTTP_200_OK)
 
