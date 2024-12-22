@@ -56,22 +56,23 @@ class RegisterView(generics.CreateAPIView):
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [permissions.AllowAny]  # Allow any user to access this view
+    permission_classes = [permissions.AllowAny]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
+        try:
+            serializer.is_valid(raise_exception=True)
             user = serializer.save()
             token, created = Token.objects.get_or_create(user=user)
             return Response({
-                "user": UserSerializer(user, context=self.get_serializer_context()).data,
-                "token": token.key,
-                "message": "User registered successfully."
+                "message": f"User '{user.name}' registered successfully.",
+                "user": UserSerializer(user, context={'request': request}).data,
+                "token": token.key
             }, status=status.HTTP_201_CREATED)
-        else:
+        except serializers.ValidationError as e:
             return Response({
-                "message": "User registration failed.",
-                "errors": serializer.errors
+                "error": "User registration failed due to invalid input.",
+                "details": e.detail
             }, status=status.HTTP_400_BAD_REQUEST)
 
 class LogoutView(APIView):
