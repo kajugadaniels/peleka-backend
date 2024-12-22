@@ -727,10 +727,13 @@ class RiderDeliveryListView(generics.ListAPIView):
     def get(self, request, *args, **kwargs):
         # Check if the user has the necessary permission
         if not request.user.is_superuser and not request.user.has_perm('system.view_riderdelivery'):
-            raise PermissionDenied({'message': "You do not have permission to view rider deliveries."})
+            raise PermissionDenied({'error': "You do not have the necessary permissions to view rider deliveries."})
 
-        # Call the default get method to return the data
-        return super().get(request, *args, **kwargs)
+        response = super().get(request, *args, **kwargs)
+        return Response({
+            'message': 'Rider deliveries retrieved successfully.',
+            'data': response.data
+        }, status=status.HTTP_200_OK)
 
 class AddRiderDeliveryView(generics.CreateAPIView):
     """
