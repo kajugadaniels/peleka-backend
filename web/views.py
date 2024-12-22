@@ -524,30 +524,41 @@ class SetRiderDeliveryInProgressView(APIView):
         - RiderDelivery.delivered must be False to allow updating.
         - If RiderDelivery.in_progress_at is already set, do not allow update.
         """
-        # Retrieve the RiderDelivery instance along with the related DeliveryRequest
         try:
             rider_delivery = RiderDelivery.objects.select_related('delivery_request').get(pk=pk)
         except RiderDelivery.DoesNotExist:
-            raise NotFound({'message': "RiderDelivery not found."})
+            return Response({
+                'error': f"RiderDelivery with ID {pk} not found."
+            }, status=status.HTTP_404_NOT_FOUND)
 
         delivery_request = rider_delivery.delivery_request
 
         # Validate if DeliveryRequest exists
         if not delivery_request:
-            raise ValidationError({'message': "Associated DeliveryRequest does not exist."})
+            return Response({
+                'error': "Associated DeliveryRequest does not exist."
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         # Validate DeliveryRequest status
         if delivery_request.status == 'Completed':
-            raise ValidationError({'message': "The delivery has already been completed and cannot be updated."})
+            return Response({
+                'error': "The delivery has already been completed and cannot be updated."
+            }, status=status.HTTP_400_BAD_REQUEST)
         elif delivery_request.status not in ['Pending', 'Accepted']:
-            raise ValidationError({'message': f"Cannot update delivery request status from '{delivery_request.status}' to 'In Progress'."})
+            return Response({
+                'error': f"Cannot update delivery request status from '{delivery_request.status}' to 'In Progress'."
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         # Validate RiderDelivery fields
         if rider_delivery.delivered:
-            raise ValidationError({'message': "Cannot update 'in_progress_at' because the delivery has already been completed."})
+            return Response({
+                'error': "Cannot update 'in_progress_at' because the delivery has already been completed."
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         if rider_delivery.in_progress_at:
-            raise ValidationError({'message': "'in_progress_at' has already been set and cannot be updated again."})
+            return Response({
+                'error': "'in_progress_at' has already been set and cannot be updated again."
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         # Update the 'in_progress_at' field to the current time
         rider_delivery.in_progress_at = timezone.now()
@@ -563,4 +574,4 @@ class SetRiderDeliveryInProgressView(APIView):
         return Response({
             'message': "'in_progress_at' set successfully and delivery request status updated to 'In Progress'.",
             'data': serializer.data
-        }, status=200)
+        }, status=status.HTTP_200_OK)
