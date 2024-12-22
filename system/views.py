@@ -23,29 +23,40 @@ class RoleListCreateView(generics.ListCreateAPIView):
         if not request.user.is_superuser:
             # Check if the user has permission to view roles
             if not request.user.has_perm('account.view_role'):
-                raise PermissionDenied({'message': "You do not have permission to view roles."})
-        return super().get(request, *args, **kwargs)
+                raise PermissionDenied({'error': "You do not have the necessary permissions to view roles."})
+        response = super().get(request, *args, **kwargs)
+        return Response({
+            'message': 'Roles retrieved successfully.',
+            'data': response.data
+        }, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
         # Superusers can perform any action
         if not request.user.is_superuser:
             # Check if the user has permission to add a role
             if not request.user.has_perm('account.add_role'):
-                raise PermissionDenied({'message': "You do not have permission to create roles."})
+                raise PermissionDenied({'error': "You do not have the necessary permissions to create roles."})
         # Handle unique constraint explicitly
         if Role.objects.filter(name=request.data.get('name')).exists():
             return Response({
-                'message': 'A role with this name already exists.'
+                'error': 'A role with this name already exists. Please choose a different name.'
             }, status=status.HTTP_400_BAD_REQUEST)
         return super().post(request, *args, **kwargs)
 
-    def perform_create(self, serializer):
-        # Save and respond with a custom message
-        role = serializer.save()
-        return Response({
-            'message': 'Role created successfully.',
-            'data': RoleSerializer(role).data
-        }, status=status.HTTP_201_CREATED)
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+            role = serializer.save()
+            return Response({
+                'message': 'Role created successfully.',
+                'data': RoleSerializer(role, context={'request': request}).data
+            }, status=status.HTTP_201_CREATED)
+        except serializers.ValidationError as e:
+            return Response({
+                'error': 'Role creation failed.',
+                'details': e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 class RoleRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     """
