@@ -116,10 +116,15 @@ class UpdateUserView(generics.UpdateAPIView):
         partial = kwargs.pop('partial', True)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-
-        return Response({
-            "user": serializer.data,
-            "message": "Account updated successfully."
-        }, status=status.HTTP_200_OK)
+        try:
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            return Response({
+                "message": "Your account has been updated successfully.",
+                "user": serializer.data
+            }, status=status.HTTP_200_OK)
+        except serializers.ValidationError as e:
+            return Response({
+                "error": "Account update failed due to invalid input.",
+                "details": e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
