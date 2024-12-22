@@ -432,30 +432,45 @@ class RiderRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     def get(self, request, *args, **kwargs):
         # Ensure user has 'view_rider' permission to retrieve Rider details
         if not request.user.is_superuser and not request.user.has_perm('system.view_rider'):
-            raise PermissionDenied({'message': "You do not have permission to view this resource."})
+            raise PermissionDenied({'error': "You do not have the necessary permissions to view this rider."})
         
-        # Call the default retrieve method without modifying response.data
-        return self.retrieve(request, *args, **kwargs)
+        rider = self.get_object()
+        serializer = self.get_serializer(rider, context={'request': request})
+        return Response({
+            'message': f"Rider '{rider.name}' retrieved successfully.",
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
 
     def put(self, request, *args, **kwargs):
         # Ensure user has 'change_rider' permission to update Rider details
         if not request.user.is_superuser and not request.user.has_perm('system.change_rider'):
-            raise PermissionDenied({'message': "You do not have permission to edit this resource."})
+            raise PermissionDenied({'error': "You do not have the necessary permissions to update this rider."})
         
-        # Call the default update method and include a success message
-        response = self.update(request, *args, **kwargs)
-        response.data = {'message': "Rider updated successfully", **response.data}
-        return response
+        rider = self.get_object()
+        serializer = self.get_serializer(rider, data=request.data, partial=True)
+        try:
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response({
+                'message': f"Rider '{rider.name}' updated successfully.",
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+        except serializers.ValidationError as e:
+            return Response({
+                'error': 'Rider update failed.',
+                'details': e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, *args, **kwargs):
         # Ensure user has 'delete_rider' permission to delete a Rider
         if not request.user.is_superuser and not request.user.has_perm('system.delete_rider'):
-            raise PermissionDenied({'message': "You do not have permission to delete this resource."})
+            raise PermissionDenied({'error': "You do not have the necessary permissions to delete this rider."})
         
-        # Call the default destroy method and include a success message
-        response = self.destroy(request, *args, **kwargs)
-        response.data = {'message': "Rider deleted successfully"}
-        return response
+        rider = self.get_object()
+        rider.delete()
+        return Response({
+            'message': f"Rider '{rider.name}' deleted successfully."
+        }, status=status.HTTP_200_OK)
 
 class DeliveryRequestListView(generics.ListAPIView):
     """
