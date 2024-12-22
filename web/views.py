@@ -301,6 +301,20 @@ class RiderDetailView(generics.RetrieveAPIView):
     serializer_class = RiderSerializer
     permission_classes = [AllowAny]
 
+    def get(self, request, *args, **kwargs):
+        try:
+            rider = self.get_object()
+        except NotFound:
+            return Response({
+                'error': f"Rider with ID {self.kwargs['pk']} not found."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(rider, context={'request': request})
+        return Response({
+            'message': f"Rider '{rider.name}' retrieved successfully.",
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+
 class ContactUsView(APIView):
     permission_classes = [AllowAny]
 
