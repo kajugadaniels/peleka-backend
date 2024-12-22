@@ -320,36 +320,52 @@ class ContactUsView(APIView):
 
     def post(self, request):
         serializer = ContactUsSerializer(data=request.data)
-        if serializer.is_valid():
+        try:
+            serializer.is_valid(raise_exception=True)
             contact = serializer.save()
             # Prepare email
             subject = f"New Contact Us Submission: {contact.subject}"
             message = f"""
-            You have received a new contact us message.
+                Dear Admin,
 
-            Name: {contact.name}
-            Email: {contact.email}
-            Subject: {contact.subject}
-            Message:
-            {contact.message}
+                You have received a new contact us message.
 
-            Submitted at: {contact.submitted_at}
+                Name: {contact.name}
+                Email: {contact.email}
+                Subject: {contact.subject}
+                Message:
+                {contact.message}
+
+                Submitted at: {contact.submitted_at.strftime('%Y-%m-%d %H:%M:%S')}
+
+                Best regards,
+                Peleka Team
             """
             from_email = settings.DEFAULT_FROM_EMAIL
             recipient_list = [settings.CONTACT_EMAIL]
 
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=from_email,
-                    recipient_list=recipient_list,
-                    fail_silently=False,
-                )
-                return Response({"detail": "Your message has been sent successfully."}, status=status.HTTP_201_CREATED)
-            except Exception as e:
-                return Response({"detail": f"Failed to send email: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=from_email,
+                recipient_list=recipient_list,
+                fail_silently=False,
+            )
+            logger.info(f"ContactUs message from '{contact.name}' sent successfully.")
+            return Response({
+                "message": "Your message has been sent successfully. We will get back to you shortly."
+            }, status=status.HTTP_201_CREATED)
+        except serializers.ValidationError as e:
+            logger.warning(f"ContactUs submission failed due to validation errors: {e.detail}")
+            return Response({
+                "error": "ContactUs submission failed due to invalid input.",
+                "details": e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Failed to send ContactUs email: {str(e)}")
+            return Response({
+                "error": "Failed to send your message. Please try again later."
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class UserDeliveryRequestListView(generics.ListAPIView):
     """
