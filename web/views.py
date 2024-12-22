@@ -262,9 +262,18 @@ class RiderCodeSearchView(APIView):
 
     def post(self, request, format=None):
         serializer = RiderCodeSearchSerializer(data=request.data, context={'request': request})
-        if serializer.is_valid():
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            serializer.is_valid(raise_exception=True)
+            data = serializer.data
+            return Response({
+                'message': 'Rider found successfully.',
+                'data': data
+            }, status=status.HTTP_200_OK)
+        except serializers.ValidationError as e:
+            return Response({
+                'error': 'Rider code search failed.',
+                'details': e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 class RiderListView(generics.ListAPIView):
     """
