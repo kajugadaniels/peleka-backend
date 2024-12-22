@@ -491,17 +491,18 @@ class UserDeleteDeliveryRequestView(generics.DestroyAPIView):
 
         # Check if the status allows deletion
         if delivery_request.status not in ['Pending', 'Cancelled']:
-            return Response(
-                {'message': "Only requests with status 'Pending' or 'Cancelled' can be deleted."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                'error': "Only delivery requests with status 'Pending' or 'Cancelled' can be deleted."
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         # Mark the delivery request as deleted
         delivery_request.delete_status = True
+        delivery_request.deleted_by = request.user.name
         delivery_request.save()
 
         return Response({
-            'message': "Delivery request marked as deleted successfully."
+            'message': f"Delivery request ID {delivery_request.id} marked as deleted successfully.",
+            'data': UserDeliveryRequestSerializer(delivery_request, context={'request': request}).data
         }, status=status.HTTP_200_OK)
 
 class SetRiderDeliveryInProgressView(APIView):
