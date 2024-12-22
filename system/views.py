@@ -138,9 +138,17 @@ class PermissionListView(generics.ListAPIView):
 
         # Users require 'auth.view_permission' permission to access this endpoint
         if not self.request.user.has_perm('auth.view_permission'):
-            raise PermissionDenied({'message': "You do not have permission to view permissions."})
+            raise PermissionDenied({'error': "You do not have the necessary permissions to view permissions."})
 
         return super().get_queryset()
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True, context={'request': request})
+        return Response({
+            'message': 'Permissions retrieved successfully.',
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
 
 class AssignPermissionView(APIView):
     """
