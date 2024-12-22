@@ -456,22 +456,24 @@ class UserDeliveryRequestUpdateView(generics.UpdateAPIView):
 
         # Check if the status allows updating
         if delivery_request.status not in ['Pending', 'Cancelled']:
-            return Response(
-                {'message': "Only requests with status 'Pending' or 'Cancelled' can be updated."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                'error': "Only delivery requests with status 'Pending' or 'Cancelled' can be updated."
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         # Deserialize and validate the data
         serializer = self.get_serializer(delivery_request, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-
-        # Save the updated delivery request
-        self.perform_update(serializer)
-
-        return Response({
-            "message": "Delivery request updated successfully.",
-            "data": serializer.data
-        }, status=status.HTTP_200_OK)
+        try:
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            return Response({
+                'message': 'Delivery request updated successfully.',
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+        except serializers.ValidationError as e:
+            return Response({
+                'error': 'Delivery request update failed due to invalid input.',
+                'details': e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 class UserDeleteDeliveryRequestView(generics.DestroyAPIView):
     """
