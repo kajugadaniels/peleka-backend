@@ -29,14 +29,6 @@ class LoginSerializer(serializers.Serializer):
                 raise serializers.ValidationError("Invalid phone number format.")
         return value
 
-    def validate_password(self, value):
-        """
-        Add password validations if needed (e.g., minimum length).
-        """
-        if len(value) < 8:
-            raise serializers.ValidationError("Password must be at least 8 characters long.")
-        return value
-
 class UserSerializer(serializers.ModelSerializer):
     role_name = serializers.CharField(source='role.name', read_only=True)
     image = serializers.ImageField(required=False)
