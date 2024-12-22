@@ -498,10 +498,13 @@ class DeliveryRequestListView(generics.ListAPIView):
     def get(self, request, *args, **kwargs):
         # Check if the user has permission to view delivery requests
         if not request.user.is_superuser and not request.user.has_perm('system.view_deliveryrequest'):
-            raise PermissionDenied({'message': "You do not have permission to view delivery requests."})
+            raise PermissionDenied({'error': "You do not have the necessary permissions to view delivery requests."})
 
-        # Call the default get method to list delivery requests
-        return super().get(request, *args, **kwargs)
+        response = super().get(request, *args, **kwargs)
+        return Response({
+            'message': 'Delivery requests retrieved successfully.',
+            'data': response.data
+        }, status=status.HTTP_200_OK)
 
 class DeliveryRequestCreateView(generics.CreateAPIView):
     """
