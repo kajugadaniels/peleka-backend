@@ -521,25 +521,22 @@ class DeliveryRequestCreateView(generics.CreateAPIView):
         """
         # Check if the user has permission to add a delivery request
         if not request.user.has_perm('system.add_deliveryrequest'):
-            raise PermissionDenied({'message': "You do not have permission to create delivery requests."})
+            raise PermissionDenied({'error': "You do not have the necessary permissions to create delivery requests."})
 
         # Deserialize the incoming data
         serializer = self.get_serializer(data=request.data)
-        
-        # Check if the provided data is valid
-        serializer.is_valid(raise_exception=True)
-        
-        # Save the delivery request and get the instance
-        delivery_request = serializer.save()
-        
-        # Return a success response with the created data
-        return Response(
-            {
+        try:
+            serializer.is_valid(raise_exception=True)
+            delivery_request = serializer.save()
+            return Response({
                 'message': 'Delivery request created successfully.',
-                'data': DeliveryRequestSerializer(delivery_request).data
-            },
-            status=status.HTTP_201_CREATED
-        )
+                'data': DeliveryRequestSerializer(delivery_request, context={'request': request}).data
+            }, status=status.HTTP_201_CREATED)
+        except serializers.ValidationError as e:
+            return Response({
+                'error': 'Delivery request creation failed due to invalid input.',
+                'details': e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 class DeliveryRequestDetailView(generics.RetrieveAPIView):
     """
