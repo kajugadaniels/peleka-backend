@@ -687,10 +687,10 @@ class CompleteDeliveryRequestView(generics.UpdateAPIView):
         delivery_request = self.get_object()
 
         if delivery_request.status == 'Completed':
-            return Response(
-                {'message': 'The delivery request is already completed.'},
-                status=status.HTTP_200_OK
-            )
+            return Response({
+                'message': 'The delivery request is already marked as completed.',
+                'data': DeliveryRequestSerializer(delivery_request, context={'request': request}).data
+            }, status=status.HTTP_200_OK)
 
         # Set status to 'Completed'
         delivery_request.status = 'Completed'
@@ -707,16 +707,13 @@ class CompleteDeliveryRequestView(generics.UpdateAPIView):
         )
 
         # Serialize the updated delivery request
-        serializer = DeliveryRequestSerializer(delivery_request)
+        serializer = self.get_serializer(delivery_request)
 
-        return Response(
-            {
-                'message': 'Delivery request marked as completed successfully.',
-                'data': serializer.data,
-                'rider_deliveries_updated': updated_count
-            },
-            status=status.HTTP_200_OK
-        )
+        return Response({
+            'message': f"Delivery request ID {delivery_request.id} marked as completed successfully.",
+            'data': serializer.data,
+            'rider_deliveries_updated': updated_count
+        }, status=status.HTTP_200_OK)
 
 class RiderDeliveryListView(generics.ListAPIView):
     """
