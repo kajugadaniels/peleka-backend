@@ -23,40 +23,29 @@ class RoleListCreateView(generics.ListCreateAPIView):
         if not request.user.is_superuser:
             # Check if the user has permission to view roles
             if not request.user.has_perm('account.view_role'):
-                raise PermissionDenied({'error': "You do not have the necessary permissions to view roles."})
-        response = super().get(request, *args, **kwargs)
-        return Response({
-            'message': 'Roles retrieved successfully.',
-            'data': response.data
-        }, status=status.HTTP_200_OK)
+                raise PermissionDenied({'message': "You do not have permission to view roles."})
+        return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
         # Superusers can perform any action
         if not request.user.is_superuser:
             # Check if the user has permission to add a role
             if not request.user.has_perm('account.add_role'):
-                raise PermissionDenied({'error': "You do not have the necessary permissions to create roles."})
+                raise PermissionDenied({'message': "You do not have permission to create roles."})
         # Handle unique constraint explicitly
         if Role.objects.filter(name=request.data.get('name')).exists():
             return Response({
-                'error': 'A role with this name already exists. Please choose a different name.'
+                'message': 'A role with this name already exists.'
             }, status=status.HTTP_400_BAD_REQUEST)
         return super().post(request, *args, **kwargs)
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
-            role = serializer.save()
-            return Response({
-                'message': 'Role created successfully.',
-                'data': RoleSerializer(role, context={'request': request}).data
-            }, status=status.HTTP_201_CREATED)
-        except serializers.ValidationError as e:
-            return Response({
-                'error': 'Role creation failed.',
-                'details': e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
+    def perform_create(self, serializer):
+        # Save and respond with a custom message
+        role = serializer.save()
+        return Response({
+            'message': 'Role created successfully.',
+            'data': RoleSerializer(role).data
+        }, status=status.HTTP_201_CREATED)
 
 class RoleRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     """
@@ -75,53 +64,42 @@ class RoleRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         if not request.user.is_superuser:
             # Check if the user has permission to view roles
             if not request.user.has_perm('account.view_role'):
-                raise PermissionDenied({'error': "You do not have the necessary permissions to view this role."})
-        role = self.get_object()
-        serializer = self.get_serializer(role, context={'request': request})
-        return Response({
-            'message': f"Role '{role.name}' retrieved successfully.",
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
+                raise PermissionDenied({'message': "You do not have permission to view roles."})
+        return super().retrieve(request, *args, **kwargs)
 
     def put(self, request, *args, **kwargs):
         # Superusers can perform any action
         if not request.user.is_superuser:
             # Check if the user has permission to change roles
             if not request.user.has_perm('account.change_role'):
-                raise PermissionDenied({'error': "You do not have the necessary permissions to update this role."})
+                raise PermissionDenied({'message': "You do not have permission to update roles."})
 
         # Check for unique role name excluding the current role
-        role_id = kwargs.get('pk')
-        new_name = request.data.get('name')
-        if Role.objects.filter(name=new_name).exclude(id=role_id).exists():
+        if Role.objects.filter(name=request.data.get('name')).exclude(id=kwargs['pk']).exists():
             return Response({
-                'error': f"A role with the name '{new_name}' already exists. Please choose a different name."
+                'message': 'A role with this name already exists.'
             }, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            response = super().update(request, *args, **kwargs)
+        
+        response = super().update(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            response.data['message'] = 'Role updated successfully.'
+            return Response(response.data, status=status.HTTP_200_OK)
+        else:
             return Response({
-                'message': f"Role '{response.data.get('name')}' updated successfully.",
-                'data': response.data
-            }, status=status.HTTP_200_OK)
-        except serializers.ValidationError as e:
-            return Response({
-                'error': 'Role update failed.',
-                'details': e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
+                'message': 'Role update failed.',
+                'errors': response.data
+            }, status=response.status_code)
 
     def delete(self, request, *args, **kwargs):
         # Superusers can perform any action
         if not request.user.is_superuser:
             # Check if the user has permission to delete roles
             if not request.user.has_perm('account.delete_role'):
-                raise PermissionDenied({'error': "You do not have the necessary permissions to delete this role."})
+                raise PermissionDenied({'message': "You do not have permission to delete roles."})
 
         role = self.get_object()
         role.delete()
-        return Response({
-            'message': f"Role '{role.name}' deleted successfully."
-        }, status=status.HTTP_200_OK)
+        return Response({'message': 'Role deleted successfully.'}, status=status.HTTP_200_OK)
 
 class PermissionListView(generics.ListAPIView):
     """
@@ -138,17 +116,9 @@ class PermissionListView(generics.ListAPIView):
 
         # Users require 'auth.view_permission' permission to access this endpoint
         if not self.request.user.has_perm('auth.view_permission'):
-            raise PermissionDenied({'error': "You do not have the necessary permissions to view permissions."})
+            raise PermissionDenied({'message': "You do not have permission to view permissions."})
 
         return super().get_queryset()
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True, context={'request': request})
-        return Response({
-            'message': 'Permissions retrieved successfully.',
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
 
 class AssignPermissionView(APIView):
     """
@@ -159,29 +129,17 @@ class AssignPermissionView(APIView):
     def post(self, request, *args, **kwargs):
         # Superusers can bypass the permission check
         if not request.user.is_superuser and not request.user.has_perm('auth.change_user'):
-            raise PermissionDenied({'error': "You do not have the necessary permissions to assign permissions."})
+            raise PermissionDenied({'message': "You do not have permission to assign permissions."})
 
         user_id = request.data.get('user_id')
         permission_codenames = request.data.get('permission_codename', [])
         response_data = []
 
-        # Validate user_id
-        if not user_id:
-            return Response({
-                'error': 'User ID is required.'
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Validate permission_codenames
-        if not permission_codenames:
-            return Response({
-                'error': 'At least one permission codename must be provided.'
-            }, status=status.HTTP_400_BAD_REQUEST)
-
         # Check if user exists
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
-            return Response({'error': f'User with ID {user_id} does not exist.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'message': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         # Assign each permission if the user doesn't already have it
         for codename in permission_codenames:
@@ -191,14 +149,11 @@ class AssignPermissionView(APIView):
                     response_data.append({'codename': codename, 'status': f'User already has the "{codename}" permission.'})
                 else:
                     user.user_permissions.add(permission)
-                    response_data.append({'codename': codename, 'status': f'Permission "{codename}" assigned successfully.'})
+                    response_data.append({'codename': codename, 'status': 'Permission assigned successfully.'})
             except Permission.DoesNotExist:
-                response_data.append({'codename': codename, 'status': f'Permission "{codename}" does not exist.'})
+                response_data.append({'codename': codename, 'status': 'Permission not found.'})
 
-        return Response({
-            'message': 'Permissions assignment process completed.',
-            'results': response_data
-        }, status=status.HTTP_200_OK)
+        return Response({'results': response_data}, status=status.HTTP_200_OK)
 
 class RemovePermissionView(APIView):
     """
@@ -208,29 +163,17 @@ class RemovePermissionView(APIView):
 
     def post(self, request, *args, **kwargs):
         if not request.user.is_superuser and not request.user.has_perm('auth.change_user'):
-            raise PermissionDenied({'error': "You do not have the necessary permissions to remove permissions."})
+            raise PermissionDenied({'message': "You do not have permission to remove permissions."})
 
         user_id = request.data.get('user_id')
         permissions_codenames = request.data.get('permission_codename', [])
         results = []
 
-        # Validate user_id
-        if not user_id:
-            return Response({
-                'error': 'User ID is required.'
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Validate permissions_codenames
-        if not permissions_codenames:
-            return Response({
-                'error': 'At least one permission codename must be provided.'
-            }, status=status.HTTP_400_BAD_REQUEST)
-
         # Check if user exists
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
-            return Response({'error': f'User with ID {user_id} does not exist.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'message': "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
         # Remove each permission if the user has it
         for codename in permissions_codenames:
@@ -238,16 +181,13 @@ class RemovePermissionView(APIView):
                 permission = Permission.objects.get(codename=codename)
                 if user.user_permissions.filter(id=permission.id).exists():
                     user.user_permissions.remove(permission)
-                    results.append({"codename": codename, "status": f'Permission "{codename}" removed successfully.'})
+                    results.append({"codename": codename, "status": "Permission removed successfully."})
                 else:
-                    results.append({"codename": codename, "status": f'User does not have the "{codename}" permission.'})
+                    results.append({"codename": codename, "status": "User does not have the specified permission."})
             except Permission.DoesNotExist:
-                results.append({"codename": codename, "status": f'Permission "{codename}" does not exist.'})
+                results.append({"codename": codename, "status": "Permission not found."})
 
-        return Response({
-            "message": "Permissions removal process completed.",
-            "results": results
-        }, status=status.HTTP_200_OK)
+        return Response({"results": results}, status=status.HTTP_200_OK)
 
 class UserPermissionsView(APIView):
     """
@@ -257,13 +197,13 @@ class UserPermissionsView(APIView):
 
     def get(self, request, user_id, *args, **kwargs):
         if not request.user.is_superuser and not request.user.has_perm('auth.view_permission'):
-            raise PermissionDenied({'error': "You do not have the necessary permissions to view this user's permissions."})
+            raise PermissionDenied({'message': "You do not have permission to view this user's permissions."})
 
         # Check if the user exists
         try:
             user = User.objects.get(pk=user_id)
         except User.DoesNotExist:
-            return Response({'error': f'User with ID {user_id} does not exist.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'message': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         # Retrieve direct and group permissions
         user_permissions = user.user_permissions.all() | Permission.objects.filter(group__user=user)
@@ -275,7 +215,7 @@ class UserPermissionsView(APIView):
         } for perm in user_permissions.distinct()]
 
         return Response({
-            'message': f"Permissions for user '{user.name}' retrieved successfully.",
+            'message': 'Permissions retrieved successfully.',
             'permissions': permissions_data
         }, status=status.HTTP_200_OK)
 
@@ -290,20 +230,16 @@ class UserListView(APIView):
         if request.user.is_superuser:
             users = User.objects.all().order_by('-id')
         elif request.user.has_perm('account.view_user'):
-            # Users with the 'view_user' permission can access all users excluding superusers
+            # Users with the 'view_user' permission can access all users
             users = User.objects.exclude(is_superuser=True).order_by('-id')
         else:
             # If the user lacks the necessary permission, return a forbidden response
-            return Response({
-                "error": "Access denied. You do not have the necessary permissions to view users."
-            }, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "You do not have permission to view this resource."},
+                            status=status.HTTP_403_FORBIDDEN)
 
         # Serialize user data for response
-        serializer = UserSerializer(users, many=True, context={'request': request})
-        return Response({
-            'message': 'Users retrieved successfully.',
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class UserDetailView(APIView):
     """
@@ -322,66 +258,41 @@ class UserDetailView(APIView):
     def get(self, request, user_id):
         user = self.get_object(user_id)
         if user is None:
-            return Response({
-                'error': f"User with ID {user_id} not found."
-            }, status=status.HTTP_404_NOT_FOUND)
-
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        
         # Only superusers or users with 'view_user' permission can view user details
         if not request.user.is_superuser and not request.user.has_perm('account.view_user'):
-            return Response({
-                "error": "Access denied. You do not have the necessary permissions to view this user's details."
-            }, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "You do not have permission to view this user."}, status=status.HTTP_403_FORBIDDEN)
 
-        serializer = UserSerializer(user, context={'request': request})
-        return Response({
-            'message': f"User '{user.name}' retrieved successfully.",
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
+        serializer = UserSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def put(self, request, user_id):
         user = self.get_object(user_id)
         if user is None:
-            return Response({
-                'error': f"User with ID {user_id} not found."
-            }, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
         # Only superusers or users with 'change_user' permission can update user details
         if not request.user.is_superuser and not request.user.has_perm('account.change_user'):
-            return Response({
-                "error": "Access denied. You do not have the necessary permissions to update this user's details."
-            }, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "You do not have permission to edit this user."}, status=status.HTTP_403_FORBIDDEN)
 
-        serializer = UserSerializer(user, data=request.data, partial=True)
-        try:
-            serializer.is_valid(raise_exception=True)
+        serializer = UserSerializer(user, data=request.data)
+        if serializer.is_valid():
             serializer.save()
-            return Response({
-                "message": f"User '{user.name}' updated successfully.",
-                "user": serializer.data
-            }, status=status.HTTP_200_OK)
-        except serializers.ValidationError as e:
-            return Response({
-                "error": "User update failed due to invalid input.",
-                "details": e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "User updated successfully", "user": serializer.data}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, user_id):
         user = self.get_object(user_id)
         if user is None:
-            return Response({
-                'error': f"User with ID {user_id} not found."
-            }, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
         # Only superusers or users with 'delete_user' permission can delete users
         if not request.user.is_superuser and not request.user.has_perm('account.delete_user'):
-            return Response({
-                "error": "Access denied. You do not have the necessary permissions to delete this user."
-            }, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "You do not have permission to delete this user."}, status=status.HTTP_403_FORBIDDEN)
 
         user.delete()
-        return Response({
-            "message": f"User '{user.name}' deleted successfully."
-        }, status=status.HTTP_204_NO_CONTENT)
+        return Response({"message": "User deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
 
 class RiderListCreateView(generics.ListCreateAPIView):
     """
@@ -395,30 +306,22 @@ class RiderListCreateView(generics.ListCreateAPIView):
     def get(self, request, *args, **kwargs):
         # Check if the user has permission to view riders
         if not request.user.is_superuser and not request.user.has_perm('system.view_rider'):
-            raise PermissionDenied({'error': "You do not have the necessary permissions to view riders."})
-        response = super().get(request, *args, **kwargs)
-        return Response({
-            'message': 'Riders retrieved successfully.',
-            'data': response.data
-        }, status=status.HTTP_200_OK)
+            raise PermissionDenied({'message': "You do not have permission to view riders."})
+        return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
         # Check if the user has permission to add a rider
         if not request.user.is_superuser and not request.user.has_perm('system.add_rider'):
-            raise PermissionDenied({'error': "You do not have the necessary permissions to add riders."})
-        serializer = self.get_serializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
-            rider = serializer.save()
-            return Response({
-                'message': f"Rider '{rider.name}' created successfully.",
-                'data': RiderSerializer(rider, context={'request': request}).data
-            }, status=status.HTTP_201_CREATED)
-        except serializers.ValidationError as e:
-            return Response({
-                'error': 'Rider creation failed.',
-                'details': e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
+            raise PermissionDenied({'message': "You do not have permission to add riders."})
+        return super().post(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        # Save the rider and return a custom response
+        rider = serializer.save()
+        return Response({
+            'message': 'Rider created successfully.',
+            'data': RiderSerializer(rider).data
+        }, status=status.HTTP_201_CREATED)
 
 class RiderRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     """
@@ -432,45 +335,30 @@ class RiderRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     def get(self, request, *args, **kwargs):
         # Ensure user has 'view_rider' permission to retrieve Rider details
         if not request.user.is_superuser and not request.user.has_perm('system.view_rider'):
-            raise PermissionDenied({'error': "You do not have the necessary permissions to view this rider."})
+            raise PermissionDenied({'message': "You do not have permission to view this resource."})
         
-        rider = self.get_object()
-        serializer = self.get_serializer(rider, context={'request': request})
-        return Response({
-            'message': f"Rider '{rider.name}' retrieved successfully.",
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
+        # Call the default retrieve method without modifying response.data
+        return self.retrieve(request, *args, **kwargs)
 
     def put(self, request, *args, **kwargs):
         # Ensure user has 'change_rider' permission to update Rider details
         if not request.user.is_superuser and not request.user.has_perm('system.change_rider'):
-            raise PermissionDenied({'error': "You do not have the necessary permissions to update this rider."})
+            raise PermissionDenied({'message': "You do not have permission to edit this resource."})
         
-        rider = self.get_object()
-        serializer = self.get_serializer(rider, data=request.data, partial=True)
-        try:
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            return Response({
-                'message': f"Rider '{rider.name}' updated successfully.",
-                'data': serializer.data
-            }, status=status.HTTP_200_OK)
-        except serializers.ValidationError as e:
-            return Response({
-                'error': 'Rider update failed.',
-                'details': e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
+        # Call the default update method and include a success message
+        response = self.update(request, *args, **kwargs)
+        response.data = {'message': "Rider updated successfully", **response.data}
+        return response
 
     def delete(self, request, *args, **kwargs):
         # Ensure user has 'delete_rider' permission to delete a Rider
         if not request.user.is_superuser and not request.user.has_perm('system.delete_rider'):
-            raise PermissionDenied({'error': "You do not have the necessary permissions to delete this rider."})
+            raise PermissionDenied({'message': "You do not have permission to delete this resource."})
         
-        rider = self.get_object()
-        rider.delete()
-        return Response({
-            'message': f"Rider '{rider.name}' deleted successfully."
-        }, status=status.HTTP_200_OK)
+        # Call the default destroy method and include a success message
+        response = self.destroy(request, *args, **kwargs)
+        response.data = {'message': "Rider deleted successfully"}
+        return response
 
 class DeliveryRequestListView(generics.ListAPIView):
     """
@@ -498,13 +386,10 @@ class DeliveryRequestListView(generics.ListAPIView):
     def get(self, request, *args, **kwargs):
         # Check if the user has permission to view delivery requests
         if not request.user.is_superuser and not request.user.has_perm('system.view_deliveryrequest'):
-            raise PermissionDenied({'error': "You do not have the necessary permissions to view delivery requests."})
+            raise PermissionDenied({'message': "You do not have permission to view delivery requests."})
 
-        response = super().get(request, *args, **kwargs)
-        return Response({
-            'message': 'Delivery requests retrieved successfully.',
-            'data': response.data
-        }, status=status.HTTP_200_OK)
+        # Call the default get method to list delivery requests
+        return super().get(request, *args, **kwargs)
 
 class DeliveryRequestCreateView(generics.CreateAPIView):
     """
@@ -521,22 +406,25 @@ class DeliveryRequestCreateView(generics.CreateAPIView):
         """
         # Check if the user has permission to add a delivery request
         if not request.user.has_perm('system.add_deliveryrequest'):
-            raise PermissionDenied({'error': "You do not have the necessary permissions to create delivery requests."})
+            raise PermissionDenied({'message': "You do not have permission to create delivery requests."})
 
         # Deserialize the incoming data
         serializer = self.get_serializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
-            delivery_request = serializer.save()
-            return Response({
+        
+        # Check if the provided data is valid
+        serializer.is_valid(raise_exception=True)
+        
+        # Save the delivery request and get the instance
+        delivery_request = serializer.save()
+        
+        # Return a success response with the created data
+        return Response(
+            {
                 'message': 'Delivery request created successfully.',
-                'data': DeliveryRequestSerializer(delivery_request, context={'request': request}).data
-            }, status=status.HTTP_201_CREATED)
-        except serializers.ValidationError as e:
-            return Response({
-                'error': 'Delivery request creation failed due to invalid input.',
-                'details': e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
+                'data': DeliveryRequestSerializer(delivery_request).data
+            },
+            status=status.HTTP_201_CREATED
+        )
 
 class DeliveryRequestDetailView(generics.RetrieveAPIView):
     """
@@ -554,23 +442,15 @@ class DeliveryRequestDetailView(generics.RetrieveAPIView):
         - If not found, raise a NotFound exception.
         """
         # Check if the user has the 'view_deliveryrequest' permission
-        if not self.request.user.has_perm('system.view_deliveryrequest') and not self.request.user.is_superuser:
-            raise PermissionDenied({'error': "You do not have the necessary permissions to view this delivery request."})
+        if not self.request.user.has_perm('system.view_deliveryrequest'):
+            raise PermissionDenied({'message': "You do not have permission to view this delivery request."})
 
         try:
             # Fetch the delivery request object by its primary key (ID)
             return DeliveryRequest.objects.get(pk=self.kwargs['pk'])
         except DeliveryRequest.DoesNotExist:
             # Raise a NotFound exception if the object does not exist
-            raise NotFound({'error': f"Delivery request with ID {self.kwargs['pk']} not found."})
-
-    def get(self, request, *args, **kwargs):
-        delivery_request = self.get_object()
-        serializer = self.get_serializer(delivery_request, context={'request': request})
-        return Response({
-            'message': f"Delivery request ID {delivery_request.id} retrieved successfully.",
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
+            raise NotFound({'message': "Delivery request not found."})
 
 class DeliveryRequestUpdateView(generics.UpdateAPIView):
     """
@@ -584,47 +464,38 @@ class DeliveryRequestUpdateView(generics.UpdateAPIView):
 
     def put(self, request, *args, **kwargs):
         # Check if the user has permission to change the delivery request
-        if not request.user.has_perm('system.change_deliveryrequest') and not request.user.is_superuser:
-            raise PermissionDenied({'error': "You do not have the necessary permissions to update this delivery request."})
+        if not request.user.has_perm('system.change_deliveryrequest'):
+            raise PermissionDenied({"message": "You do not have permission to change this delivery request."})
 
         return self.update(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
         # Retrieve the DeliveryRequest object
         delivery_request = self.get_object()
-
+        
         # Store the original status to compare later
         original_status = delivery_request.status
 
         # Use the serializer to update the object with validated data
         serializer = self.get_serializer(delivery_request, data=request.data, partial=True)
-        try:
-            serializer.is_valid(raise_exception=True)
-            self.perform_update(serializer)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
 
-            # Get the updated status
-            updated_status = serializer.validated_data.get('status', original_status)
+        # Get the updated status
+        updated_status = serializer.validated_data.get('status', original_status)
 
-            # If the status has been updated to 'Completed' and was not 'Completed' before
-            if updated_status == 'Completed' and original_status != 'Completed':
-                # Update all related RiderDelivery records to set 'delivered' to True
-                updated_count = RiderDelivery.objects.filter(delivery_request=delivery_request, delivered=False).update(
-                    delivered=True,
-                    delivered_at=timezone.now()
-                )
-                message_extra = f" Additionally, {updated_count} RiderDelivery record(s) marked as delivered."
-            else:
-                message_extra = ""
+        # If the status has been updated to 'Completed' and was not 'Completed' before
+        if updated_status == 'Completed' and original_status != 'Completed':
+            # Update all related RiderDelivery records to set 'delivered' to True
+            RiderDelivery.objects.filter(delivery_request=delivery_request, delivered=False).update(
+                delivered=True,
+                delivered_at=timezone.now()
+            )
 
-            return Response({
-                'message': f"Delivery request '{delivery_request.id}' updated successfully.{message_extra}",
-                'data': serializer.data
-            }, status=status.HTTP_200_OK)
-        except serializers.ValidationError as e:
-            return Response({
-                'error': 'Delivery request update failed due to invalid input.',
-                'details': e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "message": "Delivery request updated successfully.",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
 
 class DeleteDeliveryRequestView(generics.DestroyAPIView):
     """
@@ -638,36 +509,31 @@ class DeleteDeliveryRequestView(generics.DestroyAPIView):
     def get_object(self):
         """
         Retrieve and return the DeliveryRequest instance.
-        Check if the user has permission to delete it.
+        Check if the user has the permission to delete it.
         """
         try:
             delivery_request = DeliveryRequest.objects.get(pk=self.kwargs['pk'], delete_status=False)
         except DeliveryRequest.DoesNotExist:
-            raise NotFound({'error': f"Delivery request with ID {self.kwargs['pk']} not found or already deleted."})
+            raise NotFound({'message': "Delivery request not found or already deleted."})
 
         # Check if the user has the 'delete_deliveryrequest' permission
-        if not self.request.user.has_perm('system.delete_deliveryrequest') and not self.request.user.is_superuser:
-            raise PermissionDenied({'error': "You do not have the necessary permissions to delete this delivery request."})
+        if not self.request.user.has_perm('system.delete_deliveryrequest'):
+            raise PermissionDenied({'message': "You do not have permission to delete this delivery request."})
 
         return delivery_request
 
     def delete(self, request, *args, **kwargs):
+        """
+        Handle the deletion of a Delivery Request.
+        """
         delivery_request = self.get_object()
-
-        # Check if the status allows deletion
-        if delivery_request.status not in ['Pending', 'Cancelled']:
-            return Response({
-                'error': "Only delivery requests with status 'Pending' or 'Cancelled' can be deleted."
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Mark the delivery request as deleted
         delivery_request.delete_status = True
         delivery_request.deleted_by = request.user.name
         delivery_request.save()
 
         return Response({
-            'message': f"Delivery request ID {delivery_request.id} marked as deleted successfully.",
-            'data': DeliveryRequestSerializer(delivery_request, context={'request': request}).data
+            'message': "Delivery request marked as deleted successfully.",
+            'data': DeliveryRequestSerializer(delivery_request).data
         }, status=status.HTTP_200_OK)
 
 class CompleteDeliveryRequestView(generics.UpdateAPIView):
@@ -687,10 +553,10 @@ class CompleteDeliveryRequestView(generics.UpdateAPIView):
         delivery_request = self.get_object()
 
         if delivery_request.status == 'Completed':
-            return Response({
-                'message': 'The delivery request is already marked as completed.',
-                'data': DeliveryRequestSerializer(delivery_request, context={'request': request}).data
-            }, status=status.HTTP_200_OK)
+            return Response(
+                {'message': 'The delivery request is already completed.'},
+                status=status.HTTP_200_OK
+            )
 
         # Set status to 'Completed'
         delivery_request.status = 'Completed'
@@ -707,13 +573,16 @@ class CompleteDeliveryRequestView(generics.UpdateAPIView):
         )
 
         # Serialize the updated delivery request
-        serializer = self.get_serializer(delivery_request)
+        serializer = DeliveryRequestSerializer(delivery_request)
 
-        return Response({
-            'message': f"Delivery request ID {delivery_request.id} marked as completed successfully.",
-            'data': serializer.data,
-            'rider_deliveries_updated': updated_count
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                'message': 'Delivery request marked as completed successfully.',
+                'data': serializer.data,
+                'rider_deliveries_updated': updated_count
+            },
+            status=status.HTTP_200_OK
+        )
 
 class RiderDeliveryListView(generics.ListAPIView):
     """
@@ -727,13 +596,10 @@ class RiderDeliveryListView(generics.ListAPIView):
     def get(self, request, *args, **kwargs):
         # Check if the user has the necessary permission
         if not request.user.is_superuser and not request.user.has_perm('system.view_riderdelivery'):
-            raise PermissionDenied({'error': "You do not have the necessary permissions to view rider deliveries."})
+            raise PermissionDenied({'message': "You do not have permission to view rider deliveries."})
 
-        response = super().get(request, *args, **kwargs)
-        return Response({
-            'message': 'Rider deliveries retrieved successfully.',
-            'data': response.data
-        }, status=status.HTTP_200_OK)
+        # Call the default get method to return the data
+        return super().get(request, *args, **kwargs)
 
 class AddRiderDeliveryView(generics.CreateAPIView):
     """
@@ -751,52 +617,52 @@ class AddRiderDeliveryView(generics.CreateAPIView):
 
         # Validate input
         if not rider_id or not delivery_request_id:
-            return Response({
-                'error': "Both 'rider_id' and 'delivery_request_id' are required to assign a rider to a delivery request."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'message': "Both 'rider_id' and 'delivery_request_id' are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Fetch the rider and delivery request objects
         try:
             rider = Rider.objects.get(id=rider_id)
         except Rider.DoesNotExist:
-            return Response({'error': f"Rider with ID {rider_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
+            raise NotFound({'message': "Rider not found."})
 
         try:
             delivery_request = DeliveryRequest.objects.get(id=delivery_request_id)
         except DeliveryRequest.DoesNotExist:
-            return Response({'error': f"Delivery request with ID {delivery_request_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
+            raise NotFound({'message': "Delivery request not found."})
 
         # Check if the rider is available (no RiderDelivery with delivered=False)
         if RiderDelivery.objects.filter(rider=rider, delivered=False).exists():
-            return Response({
-                'error': f"Rider '{rider.name}' is currently unavailable for a new delivery assignment."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'message': "This rider is not available at the moment."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Assign the rider by creating a new RiderDelivery entry with delivered=False
-        try:
-            rider_delivery = RiderDelivery.objects.create(
-                rider=rider,
-                delivery_request=delivery_request,
-                delivered=False,
-                assigned_at=timezone.now(),
-                # in_progress_at=timezone.now(),
-                last_assigned_at=timezone.now()
-            )
-        except Exception as e:
-            return Response({
-                'error': f"An error occurred while assigning the rider: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        rider_delivery = RiderDelivery.objects.create(
+            rider=rider,
+            delivery_request=delivery_request,
+            delivered=False,
+            assigned_at=timezone.now(),
+            # in_progress_at=timezone.now(),
+            last_assigned_at=timezone.now()
+        )
 
         # Update the delivery request status
         delivery_request.status = 'Accepted'
         delivery_request.save()
 
-        serializer = self.get_serializer(rider_delivery, context={'request': request})
+        serializer = self.get_serializer(rider_delivery)
 
-        return Response({
-            'message': f"Rider '{rider.name}' assigned to delivery request ID {delivery_request.id} successfully.",
-            'rider_delivery': serializer.data
-        }, status=status.HTTP_201_CREATED)
+        return Response(
+            {
+                'message': "Rider assigned to delivery request successfully.",
+                'rider_delivery': serializer.data
+            },
+            status=status.HTTP_201_CREATED
+        )
 
 class RiderDeliveryDetailView(generics.RetrieveAPIView):
     """
@@ -815,18 +681,18 @@ class RiderDeliveryDetailView(generics.RetrieveAPIView):
         try:
             rider_delivery = RiderDelivery.objects.get(pk=self.kwargs['pk'])
         except RiderDelivery.DoesNotExist:
-            raise NotFound({'error': f"RiderDelivery with ID {self.kwargs['pk']} not found."})
+            raise NotFound({'message': "Rider delivery not found."})
 
         # Check if the user has permission to view rider deliveries
-        if not self.request.user.has_perm('system.view_riderdelivery') and not self.request.user.is_superuser:
-            raise PermissionDenied({'error': "You do not have the necessary permissions to view this rider delivery."})
+        if not self.request.user.has_perm('system.view_riderdelivery'):
+            raise PermissionDenied({'message': "You do not have permission to view this rider delivery."})
 
         return rider_delivery
 
     def get(self, request, *args, **kwargs):
-        rider_delivery = self.get_object()
-        serializer = self.get_serializer(rider_delivery, context={'request': request})
-        return Response({
-            'message': f"RiderDelivery ID {rider_delivery.id} retrieved successfully.",
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
+        """
+        Handle GET requests to retrieve rider delivery details.
+        - Return a detailed response with rider and delivery request information.
+        """
+        # Call the default retrieve method without modifying the response structure
+        return self.retrieve(request, *args, **kwargs)

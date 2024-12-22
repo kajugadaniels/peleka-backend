@@ -21,14 +21,10 @@ class LoginView(generics.GenericAPIView):
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
-        except serializers.ValidationError as e:
-            logger.warning(f"Login failed due to validation errors: {e.detail}")
-            return Response({
-                'error': 'Login failed due to invalid input.',
-                'details': e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
+        if not serializer.is_valid():
+            # Log the serializer errors
+            logger.warning(f"Login failed due to serializer errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         email_or_phone = serializer.validated_data['email_or_phone']
         password = serializer.validated_data['password']
@@ -37,18 +33,14 @@ class LoginView(generics.GenericAPIView):
         user = None
         if "@" in email_or_phone:
             user = authenticate(username=email_or_phone, password=password)
-            if user:
-                logger.info(f"User {user.email} logged in successfully.")
-            else:
-                logger.warning(f"Login failed for email: {email_or_phone}. Incorrect credentials.")
+            if not user:
+                logger.warning(f"Login failed for email: {email_or_phone}")
         else:
             try:
                 user = User.objects.get(phone_number=email_or_phone)
-                if user.check_password(password):
-                    logger.info(f"User with phone number {email_or_phone} logged in successfully.")
-                else:
+                if not user.check_password(password):
                     user = None
-                    logger.warning(f"Login failed for phone number: {email_or_phone}. Incorrect password.")
+                    logger.warning(f"Login failed for phone number: {email_or_phone} due to incorrect password.")
             except User.DoesNotExist:
                 logger.warning(f"Login failed: No user found with phone number: {email_or_phone}")
 
@@ -57,15 +49,16 @@ class LoginView(generics.GenericAPIView):
             Token.objects.filter(user=user).delete()
             token, created = Token.objects.get_or_create(user=user)
 
+            logger.info(f"User {user.email or user.phone_number} logged in successfully.")
+
             return Response({
                 'token': token.key,
                 'user': UserSerializer(user).data,
-                'message': f'Login successful. Welcome back, {user.name}!'
+                'message': 'Login successful.'
             }, status=status.HTTP_200_OK)
         
-        return Response({
-            'error': 'Authentication failed. Please check your email/phone number and password.'
-        }, status=status.HTTP_401_UNAUTHORIZED)
+        # For security, do not specify if it's the identifier or password that's wrong
+        return Response({'error': 'Invalid credentials.'}, status=status.HTTP_400_BAD_REQUEST)
 
 class PasswordResetRequestView(generics.GenericAPIView):
     serializer_class = PasswordResetRequestSerializer
@@ -73,16 +66,16 @@ class PasswordResetRequestView(generics.GenericAPIView):
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
+        if serializer.is_valid():
             email_or_phone = serializer.validated_data['email_or_phone']
             user = User.objects.filter(Q(email=email_or_phone) | Q(phone_number=email_or_phone)).first()
 
             if not user:
                 logger.warning(f"Password reset requested for non-existent identifier: {email_or_phone}")
-                return Response({
-                    'error': 'User with this email or phone number does not exist.'
-                }, status=status.HTTP_404_NOT_FOUND)
+                return Response(
+                    {'error': 'User with this email or phone number does not exist.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
             # Generate a 7-digit OTP
             otp = generate_otp()
@@ -94,58 +87,46 @@ class PasswordResetRequestView(generics.GenericAPIView):
             if user.email and user.email == email_or_phone:
                 # Send Email
                 subject = 'Password Reset OTP'
-                message = f"""
-                    Dear {user.name},
-
-                    You have requested to reset your password. Please use the following OTP to proceed:
-
-                    OTP: {otp}
-
-                    This OTP is valid for 10 minutes.
-
-                    If you did not request this, please ignore this message.
-
-                    Best regards,
-
-                    PELEKA Team
-                """
+                message = f'Your password reset OTP is: {otp}'
                 recipient_list = [user.email]
                 email_sent = send_email(subject, message, recipient_list)
                 if email_sent:
                     logger.info(f"Password reset OTP sent to email: {user.email}")
-                    return Response({
-                        'message': 'An OTP has been sent to your email address. Please use it to reset your password.'
-                    }, status=status.HTTP_200_OK)
+                    return Response(
+                        {'message': 'OTP has been sent to your email.'},
+                        status=status.HTTP_200_OK
+                    )
                 else:
                     logger.error(f"Failed to send OTP email to {user.email}")
-                    return Response({
-                        'error': 'Failed to send OTP email. Please try again later.'
-                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    return Response(
+                        {'error': 'Failed to send OTP email. Please try again later.'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
             elif user.phone_number and user.phone_number == email_or_phone:
                 # Send SMS
-                message = f'Dear {user.name}, your password reset OTP is: {otp}. It is valid for 10 minutes.'
+                message = f'Your password reset OTP is: {otp}'
                 sms_sent = send_sms(user.phone_number, message)
                 if sms_sent:
                     logger.info(f"Password reset OTP sent to phone number: {user.phone_number}")
-                    return Response({
-                        'message': 'An OTP has been sent to your phone number. Please use it to reset your password.'
-                    }, status=status.HTTP_200_OK)
+                    return Response(
+                        {'message': 'OTP has been sent to your phone number.'},
+                        status=status.HTTP_200_OK
+                    )
                 else:
                     logger.error(f"Failed to send OTP SMS to {user.phone_number}")
-                    return Response({
-                        'error': 'Failed to send OTP SMS. Please try again later.'
-                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    return Response(
+                        {'error': 'Failed to send OTP SMS. Please try again later.'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
             else:
                 logger.warning(f"Provided contact information does not match for user ID: {user.id}")
-                return Response({
-                    'error': 'Provided contact information does not match our records.'
-                }, status=status.HTTP_400_BAD_REQUEST)
-        except serializers.ValidationError as e:
-            logger.warning(f"Password reset request failed with validation errors: {e.detail}")
-            return Response({
-                'error': 'Password reset request failed due to invalid input.',
-                'details': e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {'error': 'Provided contact information does not match our records.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            logger.warning(f"Password reset request failed with errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class PasswordResetConfirmView(generics.GenericAPIView):
     serializer_class = PasswordResetConfirmSerializer
@@ -153,24 +134,26 @@ class PasswordResetConfirmView(generics.GenericAPIView):
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
-            user = serializer.save()
-            logger.info(f"Password reset successful for user: {user.email or user.phone_number}")
-            return Response({
-                'message': 'Your password has been reset successfully. You can now log in with your new password.'
-            }, status=status.HTTP_200_OK)
-        except serializers.ValidationError as e:
-            logger.error(f"Password reset confirmation failed due to validation errors: {e.detail}")
-            return Response({
-                'error': 'Password reset confirmation failed.',
-                'details': e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            logger.error(f"Unexpected error during password reset confirmation: {e}")
-            return Response({
-                'error': 'Password reset failed due to an unexpected error. Please try again later.'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        if serializer.is_valid():
+            try:
+                user = serializer.save()
+                logger.info(f"Password reset successful for user: {user.email or user.phone_number}")
+                return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
+            except ValidationError as ve:
+                logger.error(f"Validation error during password reset confirmation: {ve}")
+                return Response({
+                    "message": "Password reset failed.",
+                    "errors": ve.detail
+                }, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                logger.error(f"Unexpected error during password reset confirmation: {e}")
+                return Response({
+                    "message": "Password reset failed due to an unexpected error.",
+                    "errors": str(e)
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            logger.warning(f"Password reset confirmation failed with errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class RegisterView(generics.CreateAPIView):
     """
@@ -182,19 +165,18 @@ class RegisterView(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
+        if serializer.is_valid(raise_exception=True):
             user = serializer.save()
             token, created = Token.objects.get_or_create(user=user)
             return Response({
-                "message": f"User '{user.name}' registered successfully.",
-                "user": UserSerializer(user, context={'request': request}).data,
-                "token": token.key
+                "user": UserSerializer(user, context=self.get_serializer_context()).data,
+                "token": token.key,
+                "message": "User registered successfully."
             }, status=status.HTTP_201_CREATED)
-        except serializers.ValidationError as e:
+        else:
             return Response({
-                "error": "User registration failed due to invalid input.",
-                "details": e.detail
+                "message": "User registration failed.",
+                "errors": serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
 
 class LogoutView(APIView):
@@ -204,19 +186,12 @@ class LogoutView(APIView):
         try:
             if hasattr(request.user, 'auth_token'):
                 request.user.auth_token.delete()
-                logger.info(f"User '{request.user.name}' logged out successfully.")
-                return Response({
-                    "message": "Logout successful. Your session has been terminated."
-                }, status=status.HTTP_200_OK)
-            else:
-                logger.warning(f"Logout attempted for user '{request.user.name}' without an active session.")
-                return Response({
-                    "warning": "No active session found to logout."
-                }, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            logger.error(f"An unexpected error occurred during logout for user '{request.user.name}': {str(e)}")
             return Response({
-                "error": f"An unexpected error occurred during logout: {str(e)}. Please try again later."
+                "message": "Logout successful."
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                "error": f"An error occurred during logout: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class UpdateUserView(generics.UpdateAPIView):
@@ -241,18 +216,13 @@ class UpdateUserView(generics.UpdateAPIView):
         partial = kwargs.pop('partial', True)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        try:
-            serializer.is_valid(raise_exception=True)
-            self.perform_update(serializer)
-            return Response({
-                "message": "Your account has been updated successfully.",
-                "user": serializer.data
-            }, status=status.HTTP_200_OK)
-        except serializers.ValidationError as e:
-            return Response({
-                "error": "Account update failed due to invalid input.",
-                "details": e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response({
+            "user": serializer.data,
+            "message": "Account updated successfully."
+        }, status=status.HTTP_200_OK)
 
 class RiderCodeSearchView(APIView):
     """
@@ -262,18 +232,9 @@ class RiderCodeSearchView(APIView):
 
     def post(self, request, format=None):
         serializer = RiderCodeSearchSerializer(data=request.data, context={'request': request})
-        try:
-            serializer.is_valid(raise_exception=True)
-            data = serializer.data
-            return Response({
-                'message': 'Rider found successfully.',
-                'data': data
-            }, status=status.HTTP_200_OK)
-        except serializers.ValidationError as e:
-            return Response({
-                'error': 'Rider code search failed.',
-                'details': e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
+        if serializer.is_valid():
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class RiderListView(generics.ListAPIView):
     """
@@ -284,14 +245,6 @@ class RiderListView(generics.ListAPIView):
     serializer_class = RiderSerializer
     permission_classes = [AllowAny]
 
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True, context={'request': request})
-        return Response({
-            'message': 'Riders retrieved successfully.',
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
-
 class RiderDetailView(generics.RetrieveAPIView):
     """
     API view to retrieve Rider details.
@@ -301,71 +254,41 @@ class RiderDetailView(generics.RetrieveAPIView):
     serializer_class = RiderSerializer
     permission_classes = [AllowAny]
 
-    def get(self, request, *args, **kwargs):
-        try:
-            rider = self.get_object()
-        except NotFound:
-            return Response({
-                'error': f"Rider with ID {self.kwargs['pk']} not found."
-            }, status=status.HTTP_404_NOT_FOUND)
-
-        serializer = self.get_serializer(rider, context={'request': request})
-        return Response({
-            'message': f"Rider '{rider.name}' retrieved successfully.",
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
-
 class ContactUsView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = ContactUsSerializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
+        if serializer.is_valid():
             contact = serializer.save()
             # Prepare email
             subject = f"New Contact Us Submission: {contact.subject}"
             message = f"""
-                Dear Admin,
+            You have received a new contact us message.
 
-                You have received a new contact us message.
+            Name: {contact.name}
+            Email: {contact.email}
+            Subject: {contact.subject}
+            Message:
+            {contact.message}
 
-                Name: {contact.name}
-                Email: {contact.email}
-                Subject: {contact.subject}
-                Message:
-                {contact.message}
-
-                Submitted at: {contact.submitted_at.strftime('%Y-%m-%d %H:%M:%S')}
-
-                Best regards,
-                Peleka Team
+            Submitted at: {contact.submitted_at}
             """
             from_email = settings.DEFAULT_FROM_EMAIL
             recipient_list = [settings.CONTACT_EMAIL]
 
-            send_mail(
-                subject=subject,
-                message=message,
-                from_email=from_email,
-                recipient_list=recipient_list,
-                fail_silently=False,
-            )
-            logger.info(f"ContactUs message from '{contact.name}' sent successfully.")
-            return Response({
-                "message": "Your message has been sent successfully. We will get back to you shortly."
-            }, status=status.HTTP_201_CREATED)
-        except serializers.ValidationError as e:
-            logger.warning(f"ContactUs submission failed due to validation errors: {e.detail}")
-            return Response({
-                "error": "ContactUs submission failed due to invalid input.",
-                "details": e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            logger.error(f"Failed to send ContactUs email: {str(e)}")
-            return Response({
-                "error": "Failed to send your message. Please try again later."
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=from_email,
+                    recipient_list=recipient_list,
+                    fail_silently=False,
+                )
+                return Response({"detail": "Your message has been sent successfully."}, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response({"detail": f"Failed to send email: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class UserDeliveryRequestListView(generics.ListAPIView):
     """
@@ -381,12 +304,7 @@ class UserDeliveryRequestListView(generics.ListAPIView):
         return DeliveryRequest.objects.filter(client=user, delete_status=False).order_by('-created_at')
 
     def get(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True, context={'request': request})
-        return Response({
-            'message': 'Your delivery requests retrieved successfully.',
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
+        return super().get(request, *args, **kwargs)
 
 class UserDeliveryRequestCreateView(generics.CreateAPIView):
     """
@@ -397,23 +315,11 @@ class UserDeliveryRequestCreateView(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        # Automatically set the client as the logged-in user and status to "Pending"
-        return serializer.save(client=self.request.user, status="Pending")
+        # Automatically set the client as the logged-in user
+        serializer.save(client=self.request.user, status="Pending")
 
     def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
-            delivery_request = self.perform_create(serializer)
-            return Response({
-                'message': 'Delivery request created successfully.',
-                'data': UserDeliveryRequestSerializer(delivery_request, context={'request': request}).data
-            }, status=status.HTTP_201_CREATED)
-        except serializers.ValidationError as e:
-            return Response({
-                'error': 'Delivery request creation failed due to invalid input.',
-                'details': e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
+        return super().post(request, *args, **kwargs)
 
 class UserDeliveryRequestDetailView(generics.RetrieveAPIView):
     """
@@ -430,15 +336,7 @@ class UserDeliveryRequestDetailView(generics.RetrieveAPIView):
         try:
             return self.get_queryset().get(pk=self.kwargs['pk'])
         except DeliveryRequest.DoesNotExist:
-            raise NotFound({'error': f"Delivery request with ID {self.kwargs['pk']} not found."})
-
-    def get(self, request, *args, **kwargs):
-        delivery_request = self.get_object()
-        serializer = self.get_serializer(delivery_request, context={'request': request})
-        return Response({
-            'message': f"Delivery request ID {delivery_request.id} retrieved successfully.",
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
+            raise NotFound({'message': "Delivery request not found."})
 
 class UserDeliveryRequestUpdateView(generics.UpdateAPIView):
     """
@@ -456,24 +354,22 @@ class UserDeliveryRequestUpdateView(generics.UpdateAPIView):
 
         # Check if the status allows updating
         if delivery_request.status not in ['Pending', 'Cancelled']:
-            return Response({
-                'error': "Only delivery requests with status 'Pending' or 'Cancelled' can be updated."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'message': "Only requests with status 'Pending' or 'Cancelled' can be updated."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Deserialize and validate the data
         serializer = self.get_serializer(delivery_request, data=request.data, partial=True)
-        try:
-            serializer.is_valid(raise_exception=True)
-            self.perform_update(serializer)
-            return Response({
-                'message': 'Delivery request updated successfully.',
-                'data': serializer.data
-            }, status=status.HTTP_200_OK)
-        except serializers.ValidationError as e:
-            return Response({
-                'error': 'Delivery request update failed due to invalid input.',
-                'details': e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+
+        # Save the updated delivery request
+        self.perform_update(serializer)
+
+        return Response({
+            "message": "Delivery request updated successfully.",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
 
 class UserDeleteDeliveryRequestView(generics.DestroyAPIView):
     """
@@ -491,18 +387,17 @@ class UserDeleteDeliveryRequestView(generics.DestroyAPIView):
 
         # Check if the status allows deletion
         if delivery_request.status not in ['Pending', 'Cancelled']:
-            return Response({
-                'error': "Only delivery requests with status 'Pending' or 'Cancelled' can be deleted."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'message': "Only requests with status 'Pending' or 'Cancelled' can be deleted."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Mark the delivery request as deleted
         delivery_request.delete_status = True
-        delivery_request.deleted_by = request.user.name
         delivery_request.save()
 
         return Response({
-            'message': f"Delivery request ID {delivery_request.id} marked as deleted successfully.",
-            'data': UserDeliveryRequestSerializer(delivery_request, context={'request': request}).data
+            'message': "Delivery request marked as deleted successfully."
         }, status=status.HTTP_200_OK)
 
 class SetRiderDeliveryInProgressView(APIView):
@@ -524,41 +419,30 @@ class SetRiderDeliveryInProgressView(APIView):
         - RiderDelivery.delivered must be False to allow updating.
         - If RiderDelivery.in_progress_at is already set, do not allow update.
         """
+        # Retrieve the RiderDelivery instance along with the related DeliveryRequest
         try:
             rider_delivery = RiderDelivery.objects.select_related('delivery_request').get(pk=pk)
         except RiderDelivery.DoesNotExist:
-            return Response({
-                'error': f"RiderDelivery with ID {pk} not found."
-            }, status=status.HTTP_404_NOT_FOUND)
+            raise NotFound({'message': "RiderDelivery not found."})
 
         delivery_request = rider_delivery.delivery_request
 
         # Validate if DeliveryRequest exists
         if not delivery_request:
-            return Response({
-                'error': "Associated DeliveryRequest does not exist."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError({'message': "Associated DeliveryRequest does not exist."})
 
         # Validate DeliveryRequest status
         if delivery_request.status == 'Completed':
-            return Response({
-                'error': "The delivery has already been completed and cannot be updated."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError({'message': "The delivery has already been completed and cannot be updated."})
         elif delivery_request.status not in ['Pending', 'Accepted']:
-            return Response({
-                'error': f"Cannot update delivery request status from '{delivery_request.status}' to 'In Progress'."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError({'message': f"Cannot update delivery request status from '{delivery_request.status}' to 'In Progress'."})
 
         # Validate RiderDelivery fields
         if rider_delivery.delivered:
-            return Response({
-                'error': "Cannot update 'in_progress_at' because the delivery has already been completed."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError({'message': "Cannot update 'in_progress_at' because the delivery has already been completed."})
         
         if rider_delivery.in_progress_at:
-            return Response({
-                'error': "'in_progress_at' has already been set and cannot be updated again."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError({'message': "'in_progress_at' has already been set and cannot be updated again."})
 
         # Update the 'in_progress_at' field to the current time
         rider_delivery.in_progress_at = timezone.now()
@@ -574,4 +458,4 @@ class SetRiderDeliveryInProgressView(APIView):
         return Response({
             'message': "'in_progress_at' set successfully and delivery request status updated to 'In Progress'.",
             'data': serializer.data
-        }, status=status.HTTP_200_OK)
+        }, status=200)

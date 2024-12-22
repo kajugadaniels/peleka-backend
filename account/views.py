@@ -8,20 +8,14 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework import generics, permissions, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 
-class LoginView(GenericAPIView):
+class LoginView(GenericAPIView):  # Change to GenericAPIView
     permission_classes = [permissions.AllowAny]
-    serializer_class = LoginSerializer
+    serializer_class = LoginSerializer  # Ensure serializer is set
 
     def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
-        except serializers.ValidationError as e:
-            return Response({
-                'error': 'Login failed due to invalid input.',
-                'details': e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
-
+        serializer = self.get_serializer(data=request.data)  # Use get_serializer method
+        serializer.is_valid(raise_exception=True)
+        
         email = serializer.validated_data['email']
         password = serializer.validated_data['password']
 
@@ -34,21 +28,10 @@ class LoginView(GenericAPIView):
 
             return Response({
                 'token': token.key,
-                'user': UserSerializer(user, context={'request': request}).data,
-                'message': f'Login successful. Welcome back, {user.name}!'
+                'user': UserSerializer(user).data,  # Use your user serializer if needed
+                'message': 'Login successful.'
             }, status=status.HTTP_200_OK)
-        else:
-            # Check if user exists
-            user_exists = User.objects.filter(email=email).exists()
-            if not user_exists:
-                error_detail = 'No account found with the provided email.'
-            else:
-                error_detail = 'Incorrect password. Please try again.'
-
-            return Response({
-                'error': 'Authentication failed.',
-                'details': error_detail
-            }, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error': 'Invalid email or password.'}, status=status.HTTP_400_BAD_REQUEST)
 
 class RegisterView(generics.CreateAPIView):
     """
@@ -56,23 +39,22 @@ class RegisterView(generics.CreateAPIView):
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.AllowAny]  # Allow any user to access this view
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
+        if serializer.is_valid(raise_exception=True):
             user = serializer.save()
             token, created = Token.objects.get_or_create(user=user)
             return Response({
-                "message": f"User '{user.name}' registered successfully.",
-                "user": UserSerializer(user, context={'request': request}).data,
-                "token": token.key
+                "user": UserSerializer(user, context=self.get_serializer_context()).data,
+                "token": token.key,
+                "message": "User registered successfully."
             }, status=status.HTTP_201_CREATED)
-        except serializers.ValidationError as e:
+        else:
             return Response({
-                "error": "User registration failed due to invalid input.",
-                "details": e.detail
+                "message": "User registration failed.",
+                "errors": serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
 
 class LogoutView(APIView):
@@ -82,16 +64,12 @@ class LogoutView(APIView):
         try:
             if hasattr(request.user, 'auth_token'):
                 request.user.auth_token.delete()
-                return Response({
-                    "message": "Logout successful. Your session has been terminated."
-                }, status=status.HTTP_200_OK)
-            else:
-                return Response({
-                    "warning": "No active session found to logout."
-                }, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                "message": "Logout successful."
+            }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({
-                "error": f"An unexpected error occurred during logout: {str(e)}. Please try again later."
+                "error": f"An error occurred during logout: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class UpdateUserView(generics.UpdateAPIView):
@@ -116,15 +94,10 @@ class UpdateUserView(generics.UpdateAPIView):
         partial = kwargs.pop('partial', True)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        try:
-            serializer.is_valid(raise_exception=True)
-            self.perform_update(serializer)
-            return Response({
-                "message": "Your account has been updated successfully.",
-                "user": serializer.data
-            }, status=status.HTTP_200_OK)
-        except serializers.ValidationError as e:
-            return Response({
-                "error": "Account update failed due to invalid input.",
-                "details": e.detail
-            }, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response({
+            "user": serializer.data,
+            "message": "Account updated successfully."
+        }, status=status.HTTP_200_OK)
