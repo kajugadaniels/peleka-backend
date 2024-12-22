@@ -381,7 +381,12 @@ class UserDeliveryRequestListView(generics.ListAPIView):
         return DeliveryRequest.objects.filter(client=user, delete_status=False).order_by('-created_at')
 
     def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True, context={'request': request})
+        return Response({
+            'message': 'Your delivery requests retrieved successfully.',
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
 
 class UserDeliveryRequestCreateView(generics.CreateAPIView):
     """
