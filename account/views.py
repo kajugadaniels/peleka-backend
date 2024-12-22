@@ -1,14 +1,21 @@
-from account.serializers import *
+import logging
+from web.utils import *
+from system.models import *
+from web.serializers import *
+from django.db.models import Q
+from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
+from rest_framework.exceptions import NotFound
 from rest_framework.authtoken.models import Token
 from rest_framework.generics import GenericAPIView
-from rest_framework.exceptions import PermissionDenied
 from rest_framework import generics, permissions, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 
-class LoginView(GenericAPIView):
+logger = logging.getLogger(__name__)
+
+class LoginView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = LoginSerializer
 
@@ -17,15 +24,33 @@ class LoginView(GenericAPIView):
         try:
             serializer.is_valid(raise_exception=True)
         except serializers.ValidationError as e:
+            logger.warning(f"Login failed due to validation errors: {e.detail}")
             return Response({
                 'error': 'Login failed due to invalid input.',
                 'details': e.detail
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        email = serializer.validated_data['email']
+        email_or_phone = serializer.validated_data['email_or_phone']
         password = serializer.validated_data['password']
 
-        user = authenticate(username=email, password=password)
+        # Determine if the identifier is an email or phone number
+        user = None
+        if "@" in email_or_phone:
+            user = authenticate(username=email_or_phone, password=password)
+            if user:
+                logger.info(f"User {user.email} logged in successfully.")
+            else:
+                logger.warning(f"Login failed for email: {email_or_phone}. Incorrect credentials.")
+        else:
+            try:
+                user = User.objects.get(phone_number=email_or_phone)
+                if user.check_password(password):
+                    logger.info(f"User with phone number {email_or_phone} logged in successfully.")
+                else:
+                    user = None
+                    logger.warning(f"Login failed for phone number: {email_or_phone}. Incorrect password.")
+            except User.DoesNotExist:
+                logger.warning(f"Login failed: No user found with phone number: {email_or_phone}")
 
         if user:
             # Delete old token and generate a new one
@@ -34,21 +59,13 @@ class LoginView(GenericAPIView):
 
             return Response({
                 'token': token.key,
-                'user': UserSerializer(user, context={'request': request}).data,
+                'user': UserSerializer(user).data,
                 'message': f'Login successful. Welcome back, {user.name}!'
             }, status=status.HTTP_200_OK)
-        else:
-            # Check if user exists
-            user_exists = User.objects.filter(email=email).exists()
-            if not user_exists:
-                error_detail = 'No account found with the provided email.'
-            else:
-                error_detail = 'Incorrect password. Please try again.'
-
-            return Response({
-                'error': 'Authentication failed.',
-                'details': error_detail
-            }, status=status.HTTP_401_UNAUTHORIZED)
+        
+        return Response({
+            'error': 'Authentication failed. Please check your email/phone number and password.'
+        }, status=status.HTTP_401_UNAUTHORIZED)
 
 class RegisterView(generics.CreateAPIView):
     """
