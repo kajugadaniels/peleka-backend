@@ -395,22 +395,30 @@ class RiderListCreateView(generics.ListCreateAPIView):
     def get(self, request, *args, **kwargs):
         # Check if the user has permission to view riders
         if not request.user.is_superuser and not request.user.has_perm('system.view_rider'):
-            raise PermissionDenied({'message': "You do not have permission to view riders."})
-        return super().get(request, *args, **kwargs)
+            raise PermissionDenied({'error': "You do not have the necessary permissions to view riders."})
+        response = super().get(request, *args, **kwargs)
+        return Response({
+            'message': 'Riders retrieved successfully.',
+            'data': response.data
+        }, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
         # Check if the user has permission to add a rider
         if not request.user.is_superuser and not request.user.has_perm('system.add_rider'):
-            raise PermissionDenied({'message': "You do not have permission to add riders."})
-        return super().post(request, *args, **kwargs)
-
-    def perform_create(self, serializer):
-        # Save the rider and return a custom response
-        rider = serializer.save()
-        return Response({
-            'message': 'Rider created successfully.',
-            'data': RiderSerializer(rider).data
-        }, status=status.HTTP_201_CREATED)
+            raise PermissionDenied({'error': "You do not have the necessary permissions to add riders."})
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+            rider = serializer.save()
+            return Response({
+                'message': f"Rider '{rider.name}' created successfully.",
+                'data': RiderSerializer(rider, context={'request': request}).data
+            }, status=status.HTTP_201_CREATED)
+        except serializers.ValidationError as e:
+            return Response({
+                'error': 'Rider creation failed.',
+                'details': e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 class RiderRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     """
