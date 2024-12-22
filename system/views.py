@@ -290,16 +290,20 @@ class UserListView(APIView):
         if request.user.is_superuser:
             users = User.objects.all().order_by('-id')
         elif request.user.has_perm('account.view_user'):
-            # Users with the 'view_user' permission can access all users
+            # Users with the 'view_user' permission can access all users excluding superusers
             users = User.objects.exclude(is_superuser=True).order_by('-id')
         else:
             # If the user lacks the necessary permission, return a forbidden response
-            return Response({"error": "You do not have permission to view this resource."},
-                            status=status.HTTP_403_FORBIDDEN)
+            return Response({
+                "error": "Access denied. You do not have the necessary permissions to view users."
+            }, status=status.HTTP_403_FORBIDDEN)
 
         # Serialize user data for response
-        serializer = UserSerializer(users, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        serializer = UserSerializer(users, many=True, context={'request': request})
+        return Response({
+            'message': 'Users retrieved successfully.',
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
 
 class UserDetailView(APIView):
     """
