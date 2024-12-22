@@ -815,18 +815,18 @@ class RiderDeliveryDetailView(generics.RetrieveAPIView):
         try:
             rider_delivery = RiderDelivery.objects.get(pk=self.kwargs['pk'])
         except RiderDelivery.DoesNotExist:
-            raise NotFound({'message': "Rider delivery not found."})
+            raise NotFound({'error': f"RiderDelivery with ID {self.kwargs['pk']} not found."})
 
         # Check if the user has permission to view rider deliveries
-        if not self.request.user.has_perm('system.view_riderdelivery'):
-            raise PermissionDenied({'message': "You do not have permission to view this rider delivery."})
+        if not self.request.user.has_perm('system.view_riderdelivery') and not self.request.user.is_superuser:
+            raise PermissionDenied({'error': "You do not have the necessary permissions to view this rider delivery."})
 
         return rider_delivery
 
     def get(self, request, *args, **kwargs):
-        """
-        Handle GET requests to retrieve rider delivery details.
-        - Return a detailed response with rider and delivery request information.
-        """
-        # Call the default retrieve method without modifying the response structure
-        return self.retrieve(request, *args, **kwargs)
+        rider_delivery = self.get_object()
+        serializer = self.get_serializer(rider_delivery, context={'request': request})
+        return Response({
+            'message': f"RiderDelivery ID {rider_delivery.id} retrieved successfully.",
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
