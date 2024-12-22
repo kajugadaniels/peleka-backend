@@ -584,38 +584,47 @@ class DeliveryRequestUpdateView(generics.UpdateAPIView):
 
     def put(self, request, *args, **kwargs):
         # Check if the user has permission to change the delivery request
-        if not request.user.has_perm('system.change_deliveryrequest'):
-            raise PermissionDenied({"message": "You do not have permission to change this delivery request."})
+        if not request.user.has_perm('system.change_deliveryrequest') and not request.user.is_superuser:
+            raise PermissionDenied({'error': "You do not have the necessary permissions to update this delivery request."})
 
         return self.update(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
         # Retrieve the DeliveryRequest object
         delivery_request = self.get_object()
-        
+
         # Store the original status to compare later
         original_status = delivery_request.status
 
         # Use the serializer to update the object with validated data
         serializer = self.get_serializer(delivery_request, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
+        try:
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
 
-        # Get the updated status
-        updated_status = serializer.validated_data.get('status', original_status)
+            # Get the updated status
+            updated_status = serializer.validated_data.get('status', original_status)
 
-        # If the status has been updated to 'Completed' and was not 'Completed' before
-        if updated_status == 'Completed' and original_status != 'Completed':
-            # Update all related RiderDelivery records to set 'delivered' to True
-            RiderDelivery.objects.filter(delivery_request=delivery_request, delivered=False).update(
-                delivered=True,
-                delivered_at=timezone.now()
-            )
+            # If the status has been updated to 'Completed' and was not 'Completed' before
+            if updated_status == 'Completed' and original_status != 'Completed':
+                # Update all related RiderDelivery records to set 'delivered' to True
+                updated_count = RiderDelivery.objects.filter(delivery_request=delivery_request, delivered=False).update(
+                    delivered=True,
+                    delivered_at=timezone.now()
+                )
+                message_extra = f" Additionally, {updated_count} RiderDelivery record(s) marked as delivered."
+            else:
+                message_extra = ""
 
-        return Response({
-            "message": "Delivery request updated successfully.",
-            "data": serializer.data
-        }, status=status.HTTP_200_OK)
+            return Response({
+                'message': f"Delivery request '{delivery_request.id}' updated successfully.{message_extra}",
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+        except serializers.ValidationError as e:
+            return Response({
+                'error': 'Delivery request update failed due to invalid input.',
+                'details': e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 class DeleteDeliveryRequestView(generics.DestroyAPIView):
     """
