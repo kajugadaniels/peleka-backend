@@ -21,10 +21,14 @@ class LoginView(generics.GenericAPIView):
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        if not serializer.is_valid():
-            # Log the serializer errors
-            logger.warning(f"Login failed due to serializer errors: {serializer.errors}")
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except serializers.ValidationError as e:
+            logger.warning(f"Login failed due to validation errors: {e.detail}")
+            return Response({
+                'error': 'Login failed due to invalid input.',
+                'details': e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         email_or_phone = serializer.validated_data['email_or_phone']
         password = serializer.validated_data['password']
@@ -33,14 +37,18 @@ class LoginView(generics.GenericAPIView):
         user = None
         if "@" in email_or_phone:
             user = authenticate(username=email_or_phone, password=password)
-            if not user:
-                logger.warning(f"Login failed for email: {email_or_phone}")
+            if user:
+                logger.info(f"User {user.email} logged in successfully.")
+            else:
+                logger.warning(f"Login failed for email: {email_or_phone}. Incorrect credentials.")
         else:
             try:
                 user = User.objects.get(phone_number=email_or_phone)
-                if not user.check_password(password):
+                if user.check_password(password):
+                    logger.info(f"User with phone number {email_or_phone} logged in successfully.")
+                else:
                     user = None
-                    logger.warning(f"Login failed for phone number: {email_or_phone} due to incorrect password.")
+                    logger.warning(f"Login failed for phone number: {email_or_phone}. Incorrect password.")
             except User.DoesNotExist:
                 logger.warning(f"Login failed: No user found with phone number: {email_or_phone}")
 
@@ -49,16 +57,15 @@ class LoginView(generics.GenericAPIView):
             Token.objects.filter(user=user).delete()
             token, created = Token.objects.get_or_create(user=user)
 
-            logger.info(f"User {user.email or user.phone_number} logged in successfully.")
-
             return Response({
                 'token': token.key,
                 'user': UserSerializer(user).data,
-                'message': 'Login successful.'
+                'message': f'Login successful. Welcome back, {user.name}!'
             }, status=status.HTTP_200_OK)
         
-        # For security, do not specify if it's the identifier or password that's wrong
-        return Response({'error': 'Invalid credentials.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            'error': 'Authentication failed. Please check your email/phone number and password.'
+        }, status=status.HTTP_401_UNAUTHORIZED)
 
 class PasswordResetRequestView(generics.GenericAPIView):
     serializer_class = PasswordResetRequestSerializer
