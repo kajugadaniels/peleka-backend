@@ -208,17 +208,29 @@ class RemovePermissionView(APIView):
 
     def post(self, request, *args, **kwargs):
         if not request.user.is_superuser and not request.user.has_perm('auth.change_user'):
-            raise PermissionDenied({'message': "You do not have permission to remove permissions."})
+            raise PermissionDenied({'error': "You do not have the necessary permissions to remove permissions."})
 
         user_id = request.data.get('user_id')
         permissions_codenames = request.data.get('permission_codename', [])
         results = []
 
+        # Validate user_id
+        if not user_id:
+            return Response({
+                'error': 'User ID is required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate permissions_codenames
+        if not permissions_codenames:
+            return Response({
+                'error': 'At least one permission codename must be provided.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         # Check if user exists
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
-            return Response({'message': "User not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': f'User with ID {user_id} does not exist.'}, status=status.HTTP_404_NOT_FOUND)
 
         # Remove each permission if the user has it
         for codename in permissions_codenames:
@@ -226,13 +238,16 @@ class RemovePermissionView(APIView):
                 permission = Permission.objects.get(codename=codename)
                 if user.user_permissions.filter(id=permission.id).exists():
                     user.user_permissions.remove(permission)
-                    results.append({"codename": codename, "status": "Permission removed successfully."})
+                    results.append({"codename": codename, "status": f'Permission "{codename}" removed successfully.'})
                 else:
-                    results.append({"codename": codename, "status": "User does not have the specified permission."})
+                    results.append({"codename": codename, "status": f'User does not have the "{codename}" permission.'})
             except Permission.DoesNotExist:
-                results.append({"codename": codename, "status": "Permission not found."})
+                results.append({"codename": codename, "status": f'Permission "{codename}" does not exist.'})
 
-        return Response({"results": results}, status=status.HTTP_200_OK)
+        return Response({
+            "message": "Permissions removal process completed.",
+            "results": results
+        }, status=status.HTTP_200_OK)
 
 class UserPermissionsView(APIView):
     """
