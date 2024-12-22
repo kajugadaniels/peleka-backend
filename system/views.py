@@ -751,52 +751,52 @@ class AddRiderDeliveryView(generics.CreateAPIView):
 
         # Validate input
         if not rider_id or not delivery_request_id:
-            return Response(
-                {'message': "Both 'rider_id' and 'delivery_request_id' are required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                'error': "Both 'rider_id' and 'delivery_request_id' are required to assign a rider to a delivery request."
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         # Fetch the rider and delivery request objects
         try:
             rider = Rider.objects.get(id=rider_id)
         except Rider.DoesNotExist:
-            raise NotFound({'message': "Rider not found."})
+            return Response({'error': f"Rider with ID {rider_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
 
         try:
             delivery_request = DeliveryRequest.objects.get(id=delivery_request_id)
         except DeliveryRequest.DoesNotExist:
-            raise NotFound({'message': "Delivery request not found."})
+            return Response({'error': f"Delivery request with ID {delivery_request_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
 
         # Check if the rider is available (no RiderDelivery with delivered=False)
         if RiderDelivery.objects.filter(rider=rider, delivered=False).exists():
-            return Response(
-                {'message': "This rider is not available at the moment."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                'error': f"Rider '{rider.name}' is currently unavailable for a new delivery assignment."
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         # Assign the rider by creating a new RiderDelivery entry with delivered=False
-        rider_delivery = RiderDelivery.objects.create(
-            rider=rider,
-            delivery_request=delivery_request,
-            delivered=False,
-            assigned_at=timezone.now(),
-            # in_progress_at=timezone.now(),
-            last_assigned_at=timezone.now()
-        )
+        try:
+            rider_delivery = RiderDelivery.objects.create(
+                rider=rider,
+                delivery_request=delivery_request,
+                delivered=False,
+                assigned_at=timezone.now(),
+                # in_progress_at=timezone.now(),
+                last_assigned_at=timezone.now()
+            )
+        except Exception as e:
+            return Response({
+                'error': f"An error occurred while assigning the rider: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # Update the delivery request status
         delivery_request.status = 'Accepted'
         delivery_request.save()
 
-        serializer = self.get_serializer(rider_delivery)
+        serializer = self.get_serializer(rider_delivery, context={'request': request})
 
-        return Response(
-            {
-                'message': "Rider assigned to delivery request successfully.",
-                'rider_delivery': serializer.data
-            },
-            status=status.HTTP_201_CREATED
-        )
+        return Response({
+            'message': f"Rider '{rider.name}' assigned to delivery request ID {delivery_request.id} successfully.",
+            'rider_delivery': serializer.data
+        }, status=status.HTTP_201_CREATED)
 
 class RiderDeliveryDetailView(generics.RetrieveAPIView):
     """
