@@ -430,7 +430,15 @@ class UserDeliveryRequestDetailView(generics.RetrieveAPIView):
         try:
             return self.get_queryset().get(pk=self.kwargs['pk'])
         except DeliveryRequest.DoesNotExist:
-            raise NotFound({'message': "Delivery request not found."})
+            raise NotFound({'error': f"Delivery request with ID {self.kwargs['pk']} not found."})
+
+    def get(self, request, *args, **kwargs):
+        delivery_request = self.get_object()
+        serializer = self.get_serializer(delivery_request, context={'request': request})
+        return Response({
+            'message': f"Delivery request ID {delivery_request.id} retrieved successfully.",
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
 
 class UserDeliveryRequestUpdateView(generics.UpdateAPIView):
     """
