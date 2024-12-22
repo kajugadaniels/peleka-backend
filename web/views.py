@@ -204,12 +204,19 @@ class LogoutView(APIView):
         try:
             if hasattr(request.user, 'auth_token'):
                 request.user.auth_token.delete()
-            return Response({
-                "message": "Logout successful."
-            }, status=status.HTTP_200_OK)
+                logger.info(f"User '{request.user.name}' logged out successfully.")
+                return Response({
+                    "message": "Logout successful. Your session has been terminated."
+                }, status=status.HTTP_200_OK)
+            else:
+                logger.warning(f"Logout attempted for user '{request.user.name}' without an active session.")
+                return Response({
+                    "warning": "No active session found to logout."
+                }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
+            logger.error(f"An unexpected error occurred during logout for user '{request.user.name}': {str(e)}")
             return Response({
-                "error": f"An error occurred during logout: {str(e)}"
+                "error": f"An unexpected error occurred during logout: {str(e)}. Please try again later."
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class UpdateUserView(generics.UpdateAPIView):
