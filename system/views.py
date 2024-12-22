@@ -75,42 +75,53 @@ class RoleRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         if not request.user.is_superuser:
             # Check if the user has permission to view roles
             if not request.user.has_perm('account.view_role'):
-                raise PermissionDenied({'message': "You do not have permission to view roles."})
-        return super().retrieve(request, *args, **kwargs)
+                raise PermissionDenied({'error': "You do not have the necessary permissions to view this role."})
+        role = self.get_object()
+        serializer = self.get_serializer(role, context={'request': request})
+        return Response({
+            'message': f"Role '{role.name}' retrieved successfully.",
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
 
     def put(self, request, *args, **kwargs):
         # Superusers can perform any action
         if not request.user.is_superuser:
             # Check if the user has permission to change roles
             if not request.user.has_perm('account.change_role'):
-                raise PermissionDenied({'message': "You do not have permission to update roles."})
+                raise PermissionDenied({'error': "You do not have the necessary permissions to update this role."})
 
         # Check for unique role name excluding the current role
-        if Role.objects.filter(name=request.data.get('name')).exclude(id=kwargs['pk']).exists():
+        role_id = kwargs.get('pk')
+        new_name = request.data.get('name')
+        if Role.objects.filter(name=new_name).exclude(id=role_id).exists():
             return Response({
-                'message': 'A role with this name already exists.'
+                'error': f"A role with the name '{new_name}' already exists. Please choose a different name."
             }, status=status.HTTP_400_BAD_REQUEST)
-        
-        response = super().update(request, *args, **kwargs)
-        if response.status_code == status.HTTP_200_OK:
-            response.data['message'] = 'Role updated successfully.'
-            return Response(response.data, status=status.HTTP_200_OK)
-        else:
+
+        try:
+            response = super().update(request, *args, **kwargs)
             return Response({
-                'message': 'Role update failed.',
-                'errors': response.data
-            }, status=response.status_code)
+                'message': f"Role '{response.data.get('name')}' updated successfully.",
+                'data': response.data
+            }, status=status.HTTP_200_OK)
+        except serializers.ValidationError as e:
+            return Response({
+                'error': 'Role update failed.',
+                'details': e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, *args, **kwargs):
         # Superusers can perform any action
         if not request.user.is_superuser:
             # Check if the user has permission to delete roles
             if not request.user.has_perm('account.delete_role'):
-                raise PermissionDenied({'message': "You do not have permission to delete roles."})
+                raise PermissionDenied({'error': "You do not have the necessary permissions to delete this role."})
 
         role = self.get_object()
         role.delete()
-        return Response({'message': 'Role deleted successfully.'}, status=status.HTTP_200_OK)
+        return Response({
+            'message': f"Role '{role.name}' deleted successfully."
+        }, status=status.HTTP_200_OK)
 
 class PermissionListView(generics.ListAPIView):
     """
