@@ -1055,3 +1055,40 @@ class DeleteBookRiderAssignmentView(generics.DestroyAPIView):
             'message': "Book rider assignment cancelled successfully.",
             'data': BookRiderAssignmentSerializer(assignment).data
         }, status=status.HTTP_200_OK)
+
+class CompleteBookRiderAssignmentView(generics.UpdateAPIView):
+    """
+    API view to mark a BookRiderAssignment as Completed.
+    - Accessible to any authenticated user.
+    - Only updates the status to 'Completed'.
+    - If the assignment is 'Cancelled' or not 'In Progress', returns an error.
+    - Also updates related BookRider status to 'Completed'.
+    """
+    queryset = BookRiderAssignment.objects.all()
+    serializer_class = BookRiderAssignmentCompleteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, *args, **kwargs):
+        """
+        Handle PATCH requests to mark the assignment as completed.
+        """
+        assignment = self.get_object()
+
+        if assignment.status == 'Completed':
+            return Response(
+                {'message': 'The book rider assignment is already completed.'},
+                status=status.HTTP_200_OK
+            )
+        
+        # Serialize the incoming data to set status to 'Completed'
+        serializer = self.get_serializer(assignment, data={'status': 'Completed'}, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(
+            {
+                'message': 'Book rider assignment marked as completed successfully.',
+                'data': BookRiderAssignmentSerializer(assignment, context={'request': request}).data
+            },
+            status=status.HTTP_200_OK
+        )
