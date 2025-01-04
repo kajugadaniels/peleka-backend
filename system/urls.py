@@ -29,5 +29,11 @@ urlpatterns = [
 
     path('rider-deliveries/', RiderDeliveryListView.as_view(), name='riderDeliveryList'),
     path('rider-delivery/', AddRiderDeliveryView.as_view(), name='addRiderDelivery'),
-    path('rider-delivery/<int:pk>/', RiderDeliveryDetailView.as_view(), name='riderDeliveryDetail')
+    path('rider-delivery/<int:pk>/', RiderDeliveryDetailView.as_view(), name='riderDeliveryDetail'),
+
+    path('book-riders/', BookRiderListView.as_view(), name='bookRiderList'),
+    path('book-rider/', BookRiderCreateView.as_view(), name='bookRiderCreate'),
+    path('book-rider/<int:pk>/', BookRiderDetailView.as_view(), name='bookRiderDetail'),
+    path('book-rider/update/<int:pk>/', BookRiderUpdateView.as_view(), name='updateBookRider'),
+    path('book-rider/delete/<int:pk>/', DeleteBookRiderView.as_view(), name='deleteBookRider'),
 ]  + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
