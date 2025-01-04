@@ -540,3 +540,32 @@ class UserBookRiderUpdateView(generics.UpdateAPIView):
             "message": "BookRider request updated successfully.",
             "data": serializer.data
         }, status=status.HTTP_200_OK)
+
+class UserDeleteBookRiderView(generics.DestroyAPIView):
+    """
+    API view to delete a BookRider request for the logged-in user.
+    - Accessible only to authenticated users.
+    """
+    serializer_class = UserBookRiderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return BookRider.objects.filter(client=self.request.user, delete_status=False)
+
+    def delete(self, request, *args, **kwargs):
+        book_rider = self.get_object()
+
+        # Check if the status allows deletion
+        if book_rider.status not in ['Pending', 'Cancelled']:
+            return Response(
+                {'message': "Only requests with status 'Pending' or 'Cancelled' can be deleted."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Mark the BookRider request as deleted
+        book_rider.delete_status = True
+        book_rider.save()
+
+        return Response({
+            'message': "BookRider request marked as deleted successfully."
+        }, status=status.HTTP_200_OK)
