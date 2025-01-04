@@ -464,9 +464,9 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
         return user
 
-class ContactUsSerializer(serializers.ModelSerializer):
+class ContactSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ContactUs
+        model = Contact
         fields = ['id', 'name', 'email', 'subject', 'message', 'submitted_at']
         read_only_fields = ['id', 'submitted_at']
 
