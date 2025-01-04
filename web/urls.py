@@ -24,7 +24,9 @@ urlpatterns = [
     path('delivery-request/<int:pk>/', UserDeliveryRequestDetailView.as_view(), name='userDeliveryRequestDetail'),
     path('delivery-request/update/<int:pk>/', UserDeliveryRequestUpdateView.as_view(), name='userDeliveryRequestUpdate'),
     path('delivery-request/delete/<int:pk>/', UserDeleteDeliveryRequestView.as_view(), name='userDeliveryRequestDelete'),
-    
+    path('delivery-request/cancel/<int:pk>/', UserCancelDeliveryRequestView.as_view(), name='userCancelDeliveryRequest'),
+    path('delivery-request/complete/<int:pk>/', UserCompleteDeliveryRequestView.as_view(), name='userCompleteDeliveryRequest'),
+
     path('book-riders/', UserBookRiderListView.as_view(), name='userBookRiderList'),
     path('book-rider/', UserBookRiderCreateView.as_view(), name='userBookRiderCreate'),
     path('book-rider/<int:pk>/', UserBookRiderDetailView.as_view(), name='userBookRiderDetail'),
