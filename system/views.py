@@ -763,3 +763,29 @@ class BookRiderCreateView(generics.CreateAPIView):
             },
             status=status.HTTP_201_CREATED
         )
+
+class BookRiderDetailView(generics.RetrieveAPIView):
+    """
+    API view to retrieve a Book Rider by its ID.
+    - Accessible only to authenticated users with 'view_bookrider' permission.
+    """
+    queryset = BookRider.objects.all().order_by('-id')
+    serializer_class = BookRiderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        """
+        Retrieve and return the BookRider instance by ID.
+        - Check if the user has permission to view the book rider.
+        - If not found, raise a NotFound exception.
+        """
+        # Check if the user has the 'view_bookrider' permission
+        if not self.request.user.has_perm('web.view_bookrider'):
+            raise PermissionDenied({'message': "You do not have permission to view this book rider."})
+
+        try:
+            # Fetch the book rider object by its primary key (ID) and not deleted
+            return BookRider.objects.get(pk=self.kwargs['pk'], delete_status=False)
+        except BookRider.DoesNotExist:
+            # Raise a NotFound exception if the object does not exist
+            raise NotFound({'message': "Book rider not found."})
