@@ -2,6 +2,7 @@ import logging
 from web.utils import *
 from system.models import *
 from web.serializers import *
+from system.serializers import *
 from django.db.models import Q
 from django.db import transaction
 from rest_framework.views import APIView
@@ -258,7 +259,7 @@ class ContactUsView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        serializer = ContactUsSerializer(data=request.data)
+        serializer = ContactSerializer(data=request.data)
         if serializer.is_valid():
             contact = serializer.save()
             # Prepare email
@@ -400,65 +401,66 @@ class UserDeleteDeliveryRequestView(generics.DestroyAPIView):
             'message': "Delivery request marked as deleted successfully."
         }, status=status.HTTP_200_OK)
 
-class SetRiderDeliveryInProgressView(APIView):
+class UserCancelDeliveryRequestView(generics.UpdateAPIView):
     """
-    API view to set the 'in_progress_at' field of a RiderDelivery to the current time
-    and update the related DeliveryRequest status to 'In Progress'.
-    - Accessible to any user without authentication or specific permissions.
+    API view to cancel a Delivery Request.
+    - Only requests with status 'Pending' can be canceled.
+    - Accessible only to authenticated users.
     """
-    permission_classes = [AllowAny]  # Allow access to any user
+    serializer_class = UserDeliveryRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
-    @transaction.atomic
-    def post(self, request, pk, *args, **kwargs):
-        """
-        Set 'in_progress_at' for the RiderDelivery with the given pk and update
-        the related DeliveryRequest status to 'In Progress' with validations:
-        
-        - DeliveryRequest.status must be 'Pending' or 'Accepted' to update to 'In Progress'.
-        - If DeliveryRequest.status is 'Completed', do not allow update.
-        - RiderDelivery.delivered must be False to allow updating.
-        - If RiderDelivery.in_progress_at is already set, do not allow update.
-        """
-        # Retrieve the RiderDelivery instance along with the related DeliveryRequest
-        try:
-            rider_delivery = RiderDelivery.objects.select_related('delivery_request').get(pk=pk)
-        except RiderDelivery.DoesNotExist:
-            raise NotFound({'message': "RiderDelivery not found."})
+    def get_queryset(self):
+        return DeliveryRequest.objects.filter(client=self.request.user, delete_status=False)
 
-        delivery_request = rider_delivery.delivery_request
+    def update(self, request, *args, **kwargs):
+        delivery_request = self.get_object()
 
-        # Validate if DeliveryRequest exists
-        if not delivery_request:
-            raise ValidationError({'message': "Associated DeliveryRequest does not exist."})
+        if delivery_request.status != 'Pending':
+            return Response(
+                {'message': "Only Delivery Requests with status 'Pending' can be canceled."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # Validate DeliveryRequest status
-        if delivery_request.status == 'Completed':
-            raise ValidationError({'message': "The delivery has already been completed and cannot be updated."})
-        elif delivery_request.status not in ['Pending', 'Accepted']:
-            raise ValidationError({'message': f"Cannot update delivery request status from '{delivery_request.status}' to 'In Progress'."})
-
-        # Validate RiderDelivery fields
-        if rider_delivery.delivered:
-            raise ValidationError({'message': "Cannot update 'in_progress_at' because the delivery has already been completed."})
-        
-        if rider_delivery.in_progress_at:
-            raise ValidationError({'message': "'in_progress_at' has already been set and cannot be updated again."})
-
-        # Update the 'in_progress_at' field to the current time
-        rider_delivery.in_progress_at = timezone.now()
-        rider_delivery.save()
-
-        # Update the related DeliveryRequest status to 'In Progress'
-        delivery_request.status = 'In Progress'
+        delivery_request.status = 'Cancelled'
         delivery_request.save()
 
-        # Serialize the updated RiderDelivery instance
-        serializer = RiderDeliverySerializer(rider_delivery, context={'request': request})
-
+        serializer = self.get_serializer(delivery_request)
         return Response({
-            'message': "'in_progress_at' set successfully and delivery request status updated to 'In Progress'.",
-            'data': serializer.data
-        }, status=200)
+            "message": "Delivery Request canceled successfully.",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
+
+
+class UserCompleteDeliveryRequestView(generics.UpdateAPIView):
+    """
+    API view to complete a Delivery Request.
+    - Only requests with status 'Accepted' can be completed.
+    - Accessible only to authenticated users.
+    """
+    serializer_class = UserDeliveryRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return DeliveryRequest.objects.filter(client=self.request.user, delete_status=False)
+
+    def update(self, request, *args, **kwargs):
+        delivery_request = self.get_object()
+
+        if delivery_request.status not in ['Accepted', 'In Progress']:
+            return Response(
+                {'message': "Only Delivery Requests with status 'Accepted' or 'In Progress' can be completed."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        delivery_request.status = 'Completed'
+        delivery_request.save()
+
+        serializer = self.get_serializer(delivery_request)
+        return Response({
+            "message": "Delivery Request completed successfully.",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
 
 class UserBookRiderListView(generics.ListAPIView):
     """
@@ -629,6 +631,66 @@ class UserCompleteBookRiderView(generics.UpdateAPIView):
             "message": "BookRider request completed successfully.",
             "data": serializer.data
         }, status=status.HTTP_200_OK)
+
+class SetRiderDeliveryInProgressView(APIView):
+    """
+    API view to set the 'in_progress_at' field of a RiderDelivery to the current time
+    and update the related DeliveryRequest status to 'In Progress'.
+    - Accessible to any user without authentication or specific permissions.
+    """
+    permission_classes = [AllowAny]  # Allow access to any user
+
+    @transaction.atomic
+    def post(self, request, pk, *args, **kwargs):
+        """
+        Set 'in_progress_at' for the RiderDelivery with the given pk and update
+        the related DeliveryRequest status to 'In Progress' with validations:
+        
+        - DeliveryRequest.status must be 'Pending' or 'Accepted' to update to 'In Progress'.
+        - If DeliveryRequest.status is 'Completed', do not allow update.
+        - RiderDelivery.delivered must be False to allow updating.
+        - If RiderDelivery.in_progress_at is already set, do not allow update.
+        """
+        # Retrieve the RiderDelivery instance along with the related DeliveryRequest
+        try:
+            rider_delivery = RiderDelivery.objects.select_related('delivery_request').get(pk=pk)
+        except RiderDelivery.DoesNotExist:
+            raise NotFound({'message': "RiderDelivery not found."})
+
+        delivery_request = rider_delivery.delivery_request
+
+        # Validate if DeliveryRequest exists
+        if not delivery_request:
+            raise ValidationError({'message': "Associated DeliveryRequest does not exist."})
+
+        # Validate DeliveryRequest status
+        if delivery_request.status == 'Completed':
+            raise ValidationError({'message': "The delivery has already been completed and cannot be updated."})
+        elif delivery_request.status not in ['Pending', 'Accepted']:
+            raise ValidationError({'message': f"Cannot update delivery request status from '{delivery_request.status}' to 'In Progress'."})
+
+        # Validate RiderDelivery fields
+        if rider_delivery.delivered:
+            raise ValidationError({'message': "Cannot update 'in_progress_at' because the delivery has already been completed."})
+        
+        if rider_delivery.in_progress_at:
+            raise ValidationError({'message': "'in_progress_at' has already been set and cannot be updated again."})
+
+        # Update the 'in_progress_at' field to the current time
+        rider_delivery.in_progress_at = timezone.now()
+        rider_delivery.save()
+
+        # Update the related DeliveryRequest status to 'In Progress'
+        delivery_request.status = 'In Progress'
+        delivery_request.save()
+
+        # Serialize the updated RiderDelivery instance
+        serializer = RiderDeliverySerializer(rider_delivery, context={'request': request})
+
+        return Response({
+            'message': "'in_progress_at' set successfully and delivery request status updated to 'In Progress'.",
+            'data': serializer.data
+        }, status=200)
 
 class SetBookRiderAssignmentInProgressView(APIView):
     """
