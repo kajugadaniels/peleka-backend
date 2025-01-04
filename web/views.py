@@ -459,3 +459,19 @@ class SetRiderDeliveryInProgressView(APIView):
             'message': "'in_progress_at' set successfully and delivery request status updated to 'In Progress'.",
             'data': serializer.data
         }, status=200)
+
+class UserBookRiderListView(generics.ListAPIView):
+    """
+    API view to list all BookRider requests for the logged-in user.
+    - Accessible only to authenticated users.
+    """
+    serializer_class = UserBookRiderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Only fetch BookRider requests made by the logged-in user
+        user = self.request.user
+        return BookRider.objects.filter(client=user, delete_status=False).order_by('-created_at')
+
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
