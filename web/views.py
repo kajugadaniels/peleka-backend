@@ -507,3 +507,36 @@ class UserBookRiderDetailView(generics.RetrieveAPIView):
             return self.get_queryset().get(pk=self.kwargs['pk'])
         except BookRider.DoesNotExist:
             raise NotFound({'message': "BookRider request not found."})
+
+class UserBookRiderUpdateView(generics.UpdateAPIView):
+    """
+    API view to update a BookRider request for the logged-in user.
+    - Accessible only to authenticated users.
+    """
+    serializer_class = UserBookRiderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return BookRider.objects.filter(client=self.request.user, delete_status=False)
+
+    def update(self, request, *args, **kwargs):
+        book_rider = self.get_object()
+
+        # Check if the status allows updating
+        if book_rider.status not in ['Pending', 'Cancelled']:
+            return Response(
+                {'message': "Only requests with status 'Pending' or 'Cancelled' can be updated."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Deserialize and validate the data
+        serializer = self.get_serializer(book_rider, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        # Save the updated BookRider request
+        self.perform_update(serializer)
+
+        return Response({
+            "message": "BookRider request updated successfully.",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
