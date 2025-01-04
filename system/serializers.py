@@ -254,3 +254,35 @@ class DeliveryRequestCompleteSerializer(serializers.ModelSerializer):
         if attrs.get('status') != 'Completed':
             raise serializers.ValidationError("Status can only be updated to 'Completed'.")
         return attrs
+
+class BookRiderSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the BookRider model.
+    Includes client information and ensures that delete_status is read-only.
+    """
+    client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who booked the rider')
+    client_phone = serializers.ReadOnlyField(source='client.phone_number', help_text='The phone number of the client who booked the rider')
+
+    class Meta:
+        model = BookRider
+        fields = [
+            'id', 'client', 'client_name', 'client_phone', 'pickup_address', 'pickup_lat', 'pickup_lng',
+            'delivery_address', 'delivery_lat', 'delivery_lng', 'estimated_distance_km', 
+            'estimated_delivery_time', 'booking_price', 'payment_type', 'status', 
+            'delete_status', 'deleted_by', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'delete_status', 'deleted_by', 'created_at', 'updated_at', 'client_name', 'client_phone']
+        extra_kwargs = {
+            'client': {'write_only': True},
+            'booking_price': {'required': False, 'allow_null': True},
+            'payment_type': {'required': False, 'allow_null': True},
+        }
+
+    def create(self, validated_data):
+        """
+        Create a new BookRider instance.
+        Automatically sets the client to the requesting user.
+        """
+        book_rider = BookRider(**validated_data)
+        book_rider.save()
+        return book_rider
