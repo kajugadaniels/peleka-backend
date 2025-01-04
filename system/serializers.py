@@ -384,3 +384,24 @@ class BookRiderAssignmentSerializer(serializers.ModelSerializer):
         instance.status = status
         instance.save()
         return instance
+
+class BookRiderAssignmentCompleteSerializer(serializers.ModelSerializer):
+    """
+    Serializer for marking a BookRiderAssignment as Completed.
+    Only allows the status to be set to 'Completed' and prevents completion if cancelled.
+    """
+    
+    class Meta:
+        model = BookRiderAssignment
+        fields = ['status']
+    
+    def validate(self, attrs):
+        if attrs.get('status') != 'Completed':
+            raise serializers.ValidationError("Status can only be updated to 'Completed'.")
+        # Check if the current status is 'Cancelled'
+        if self.instance.status == 'Cancelled':
+            raise serializers.ValidationError("Cannot complete a cancelled booking.")
+        # Ensure current status is 'In Progress'
+        if self.instance.status != 'In Progress':
+            raise serializers.ValidationError("Only assignments with status 'In Progress' can be marked as 'Completed'.")
+        return attrs
