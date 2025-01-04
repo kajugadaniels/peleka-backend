@@ -629,3 +629,64 @@ class UserCompleteBookRiderView(generics.UpdateAPIView):
             "message": "BookRider request completed successfully.",
             "data": serializer.data
         }, status=status.HTTP_200_OK)
+
+class SetBookRiderAssignmentInProgressView(APIView):
+    """
+    API view to set the 'in_progress_at' field of a BookRiderAssignment to the current time
+    and update the related BookRider status to 'In Progress'.
+    - Accessible to any user without authentication or specific permissions.
+    """
+    permission_classes = [permissions.AllowAny]  # Allow access to any user
+
+    @transaction.atomic
+    def post(self, request, pk, *args, **kwargs):
+        """
+        Set 'in_progress_at' for the BookRiderAssignment with the given pk and update
+        the related BookRider status to 'In Progress' with validations:
+        
+        - BookRider.status must be 'Pending', 'Confirmed', or 'In Progress' to update to 'In Progress'.
+        - If BookRider.status is 'Completed' or 'Cancelled', do not allow update.
+        - BookRiderAssignment.status must not be 'Completed' or 'Cancelled' to allow updating.
+        - If BookRiderAssignment.in_progress_at is already set, do not allow update.
+        """
+        # Retrieve the BookRiderAssignment instance along with the related BookRider
+        try:
+            assignment = BookRiderAssignment.objects.select_related('book_rider').get(pk=pk)
+        except BookRiderAssignment.DoesNotExist:
+            raise NotFound({'message': "BookRiderAssignment not found."})
+
+        book_rider = assignment.book_rider
+
+        # Validate if BookRider exists
+        if not book_rider:
+            raise ValidationError({'message': "Associated BookRider does not exist."})
+
+        # Validate BookRider status
+        if book_rider.status in ['Completed', 'Cancelled']:
+            raise ValidationError({'message': f"The booking is already '{book_rider.status}' and cannot be updated to 'In Progress'."})
+        elif book_rider.status not in ['Pending', 'Confirmed', 'In Progress']:
+            raise ValidationError({'message': f"Cannot update booking status from '{book_rider.status}' to 'In Progress'."})
+
+        # Validate BookRiderAssignment fields
+        if assignment.status in ['Completed', 'Cancelled']:
+            raise ValidationError({'message': f"Cannot update 'in_progress_at' because the assignment is '{assignment.status}'."})
+        
+        if assignment.in_progress_at:
+            raise ValidationError({'message': "'in_progress_at' has already been set and cannot be updated again."})
+
+        # Update the 'in_progress_at' field to the current time
+        assignment.in_progress_at = timezone.now()
+        assignment.status = 'In Progress'
+        assignment.save()
+
+        # Update the related BookRider status to 'In Progress'
+        book_rider.status = 'In Progress'
+        book_rider.save()
+
+        # Serialize the updated BookRiderAssignment instance
+        serializer = BookRiderAssignmentSerializer(assignment, context={'request': request})
+
+        return Response({
+            'message': "'in_progress_at' set successfully and booking status updated to 'In Progress'.",
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
