@@ -892,3 +892,11 @@ class BookRiderAssignmentListView(generics.ListAPIView):
 
         # If the user does not have the required permission, return an empty queryset
         return BookRiderAssignment.objects.none()
+
+    def get(self, request, *args, **kwargs):
+        # Check if the user has permission to view book rider assignments
+        if not request.user.is_superuser and not request.user.has_perm('system.view_bookriderassignment'):
+            raise PermissionDenied({'message': "You do not have permission to view book rider assignments."})
+
+        # Call the default get method to list assignments
+        return super().get(request, *args, **kwargs)
