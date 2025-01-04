@@ -36,4 +36,11 @@ urlpatterns = [
     path('book-rider/<int:pk>/', BookRiderDetailView.as_view(), name='bookRiderDetail'),
     path('book-rider/update/<int:pk>/', BookRiderUpdateView.as_view(), name='updateBookRider'),
     path('book-rider/delete/<int:pk>/', DeleteBookRiderView.as_view(), name='deleteBookRider'),
+
+    path('book-rider-assignments/', BookRiderAssignmentListView.as_view(), name='bookRiderAssignmentList'),
+    path('book-rider-assignment/', AddBookRiderAssignmentView.as_view(), name='addBookRiderAssignment'),
+    path('book-rider-assignment/<int:pk>/', BookRiderAssignmentDetailView.as_view(), name='bookRiderAssignmentDetail'),
+    path('book-rider-assignment/update/<int:pk>/', UpdateBookRiderAssignmentView.as_view(), name='updateBookRiderAssignment'),
+    path('book-rider-assignment/delete/<int:pk>/', DeleteBookRiderAssignmentView.as_view(), name='deleteBookRiderAssignment'),
+    path('book-rider-assignment/<int:pk>/complete/', CompleteBookRiderAssignmentView.as_view(), name='completeBookRiderAssignment'),
 ]  + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
