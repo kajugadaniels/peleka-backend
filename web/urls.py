@@ -24,6 +24,15 @@ urlpatterns = [
     path('delivery-request/<int:pk>/', UserDeliveryRequestDetailView.as_view(), name='userDeliveryRequestDetail'),
     path('delivery-request/update/<int:pk>/', UserDeliveryRequestUpdateView.as_view(), name='userDeliveryRequestUpdate'),
     path('delivery-request/delete/<int:pk>/', UserDeleteDeliveryRequestView.as_view(), name='userDeliveryRequestDelete'),
+    
+    path('book-riders/', UserBookRiderListView.as_view(), name='userBookRiderList'),
+    path('book-rider/', UserBookRiderCreateView.as_view(), name='userBookRiderCreate'),
+    path('book-rider/<int:pk>/', UserBookRiderDetailView.as_view(), name='userBookRiderDetail'),
+    path('book-rider/update/<int:pk>/', UserBookRiderUpdateView.as_view(), name='userBookRiderUpdate'),
+    path('book-rider/delete/<int:pk>/', UserDeleteBookRiderView.as_view(), name='userBookRiderDelete'),
+    path('book-rider/cancel/<int:pk>/', UserCancelBookRiderView.as_view(), name='userCancelBookRider'),
+    path('book-rider/complete/<int:pk>/', UserCompleteBookRiderView.as_view(), name='userCompleteBookRider'),
 
     path('rider-delivery/<int:pk>/set-in-progress/', SetRiderDeliveryInProgressView.as_view(), name='setRiderDeliveryInProgress'),
+    path('book-rider-assignment/<int:pk>/set-in-progress/', SetBookRiderAssignmentInProgressView.as_view(), name='setBookRiderAssignmentInProgress'),
 ]  + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
