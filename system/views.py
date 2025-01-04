@@ -688,3 +688,33 @@ class RiderDeliveryDetailView(generics.RetrieveAPIView):
         """
         # Call the default retrieve method without modifying the response structure
         return self.retrieve(request, *args, **kwargs)
+
+class BookRiderListView(generics.ListAPIView):
+    """
+    API view to list all active Book Riders.
+    - Accessible only to users with 'view_bookrider' permission.
+    - Superusers can view all bookings, including those marked as deleted.
+    - Non-superusers will see only non-deleted and active bookings (status not 'Cancelled' or 'Completed').
+    """
+    serializer_class = BookRiderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        # Superusers can see all book riders, including deleted ones
+        if user.is_superuser:
+            return BookRider.objects.all().order_by('-created_at')
+            # return BookRider.objects.filter(delete_status=False).order_by('-created_at')
+
+        # Other users can only see non-deleted and active book riders
+        if user.has_perm('web.view_bookrider'):
+            return BookRider.objects.filter(
+                delete_status=False,
+                status__in=['Pending', 'Confirmed']
+            ).order_by('-created_at')
+
+        # If the user does not have the required permission, return an empty queryset
+        return BookRider.objects.none()
+
+    
