@@ -869,3 +869,26 @@ class DeleteBookRiderView(generics.DestroyAPIView):
             'message': "Book rider marked as deleted successfully.",
             'data': BookRiderSerializer(book_rider).data
         }, status=status.HTTP_200_OK)
+
+class BookRiderAssignmentListView(generics.ListAPIView):
+    """
+    API view to list all Book Rider Assignments.
+    - Accessible only to authenticated users with 'view_bookriderassignment' permission.
+    - Superusers can view all assignments, including those marked as deleted.
+    """
+    serializer_class = BookRiderAssignmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        # Superusers can see all assignments, including deleted ones
+        if user.is_superuser:
+            return BookRiderAssignment.objects.all().order_by('-assigned_at')
+
+        # Other users can only see assignments related to their BookRiders and not deleted
+        if user.has_perm('system.view_bookriderassignment'):
+            return BookRiderAssignment.objects.filter(book_rider__client=user, book_rider__delete_status=False).order_by('-assigned_at')
+
+        # If the user does not have the required permission, return an empty queryset
+        return BookRiderAssignment.objects.none()
