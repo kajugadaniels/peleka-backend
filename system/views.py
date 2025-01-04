@@ -900,3 +900,39 @@ class BookRiderAssignmentListView(generics.ListAPIView):
 
         # Call the default get method to list assignments
         return super().get(request, *args, **kwargs)
+
+class AddBookRiderAssignmentView(generics.CreateAPIView):
+    """
+    API view to assign a rider to a BookRider request.
+    - Accessible only to authenticated users with 'add_bookriderassignment' permission.
+    - Automatically updates the BookRider status to "Confirmed" upon assignment.
+    """
+    queryset = BookRiderAssignment.objects.all().order_by('-assigned_at')
+    serializer_class = BookRiderAssignmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        """
+        Handle the creation of a new book rider assignment.
+        """
+        # Check if the user has permission to add a book rider assignment
+        if not request.user.has_perm('system.add_bookriderassignment'):
+            raise PermissionDenied({'message': "You do not have permission to assign riders to book rider requests."})
+
+        # Deserialize the incoming data
+        serializer = self.get_serializer(data=request.data)
+        
+        # Validate the data
+        serializer.is_valid(raise_exception=True)
+        
+        # Assign the rider and save the assignment
+        assignment = serializer.save()
+        
+        # Return a success response with the created assignment data
+        return Response(
+            {
+                'message': 'Rider assigned to book rider request successfully.',
+                'data': BookRiderAssignmentSerializer(assignment, context={'request': request}).data
+            },
+            status=status.HTTP_201_CREATED
+        )
