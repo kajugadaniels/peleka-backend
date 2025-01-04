@@ -1010,3 +1010,29 @@ class UpdateBookRiderAssignmentView(generics.UpdateAPIView):
             "message": "Book rider assignment updated successfully.",
             "data": serializer.data
         }, status=status.HTTP_200_OK)
+
+class DeleteBookRiderAssignmentView(generics.DestroyAPIView):
+    """
+    API view to delete a BookRiderAssignment.
+    - Accessible only to authenticated users with the 'delete_bookriderassignment' permission.
+    - Implements soft deletion by setting a delete_status flag.
+    """
+    queryset = BookRiderAssignment.objects.all()
+    serializer_class = BookRiderAssignmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        """
+        Retrieve and return the BookRiderAssignment instance.
+        - Ensure the user has permission to delete the assignment.
+        """
+        try:
+            assignment = BookRiderAssignment.objects.get(pk=self.kwargs['pk'])
+        except BookRiderAssignment.DoesNotExist:
+            raise NotFound({'message': "Book rider assignment not found."})
+
+        # Check if the user has permission to delete the assignment
+        if not self.request.user.has_perm('system.delete_bookriderassignment'):
+            raise PermissionDenied({'message': "You do not have permission to delete this book rider assignment."})
+
+        return assignment
