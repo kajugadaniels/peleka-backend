@@ -149,7 +149,11 @@ class UserDeliveryRequestSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'rider_name', 'rider_phone_number', 'rider_address', 
             'rider_code', 'rider_nid', 'rider_image'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = [
+            'id', 'client_name', 'client_phone', 'delivery_price', 'created_at', 'updated_at',
+            'rider_name', 'rider_phone_number', 'rider_address', 'rider_code', 'rider_nid', 'rider_image',
+            'status'  # Make status read-only to prevent arbitrary changes
+        ]
         extra_kwargs = {
             'client': {'write_only': True},
             'image': {'required': False, 'allow_null': True},
@@ -191,6 +195,9 @@ class UserDeliveryRequestSerializer(serializers.ModelSerializer):
         return delivery_request
 
     def update(self, instance, validated_data):
+        # Prevent status from being updated directly through the serializer
+        validated_data.pop('status', None)
+
         image = validated_data.pop('image', None)
         if image is not None:
             instance.image = image
@@ -292,6 +299,81 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
                 if instance.delivery_request:
                     instance.delivery_request.status = 'Completed'
                     instance.delivery_request.save()
+
+        instance.save()
+        return instance
+
+class UserBookRiderSerializer(serializers.ModelSerializer):
+    client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the booking')
+    client_phone = serializers.ReadOnlyField(source='client.phone_number', help_text='The phone number of the client who made the booking')
+    booking_price = serializers.DecimalField(max_digits=10, decimal_places=2, help_text='Automatically calculated price based on distance')
+    rider_name = serializers.SerializerMethodField()
+    rider_phone_number = serializers.SerializerMethodField()
+    rider_address = serializers.SerializerMethodField()
+    rider_code = serializers.SerializerMethodField()
+    rider_nid = serializers.SerializerMethodField()
+    rider_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BookRider
+        fields = [
+            'id', 'client', 'client_name', 'client_phone', 'pickup_address', 'pickup_lat', 'pickup_lng',
+            'delivery_address', 'delivery_lat', 'delivery_lng', 'estimated_distance_km', 'estimated_delivery_time',
+            'booking_price', 'payment_type',
+            'status', 'delete_status', 'deleted_by',
+            'created_at', 'updated_at',
+            'rider_name', 'rider_phone_number', 'rider_address',
+            'rider_code', 'rider_nid', 'rider_image'
+        ]
+        read_only_fields = ['id', 'client_name', 'client_phone', 'booking_price', 'created_at', 'updated_at',
+                            'rider_name', 'rider_phone_number', 'rider_address', 'rider_code', 'rider_nid', 'rider_image']
+        extra_kwargs = {
+            'client': {'write_only': True},
+            'deleted_by': {'write_only': True, 'required': False, 'allow_null': True},
+            'status': {'read_only': True},  # Make status read-only to prevent arbitrary changes
+        }
+
+    def get_rider_info(self, obj, attribute):
+        assignment = obj.assignments.first()
+        if assignment and assignment.rider:
+            rider = assignment.rider
+            return getattr(rider, attribute, None)
+        return None
+
+    def get_rider_image(self, obj):
+        image = self.get_rider_info(obj, 'image')
+        if image:
+            request = self.context.get('request')
+            if request is not None:
+                return request.build_absolute_uri(image.url)
+        return None
+
+    def get_rider_name(self, obj):
+        return self.get_rider_info(obj, 'name')
+
+    def get_rider_phone_number(self, obj):
+        return self.get_rider_info(obj, 'phone_number')
+
+    def get_rider_address(self, obj):
+        return self.get_rider_info(obj, 'address')
+
+    def get_rider_code(self, obj):
+        return self.get_rider_info(obj, 'code')
+
+    def get_rider_nid(self, obj):
+        return self.get_rider_info(obj, 'nid')
+
+    def create(self, validated_data):
+        book_rider = BookRider(**validated_data)
+        book_rider.save()
+        return book_rider
+
+    def update(self, instance, validated_data):
+        # Prevent status from being updated directly through the serializer
+        validated_data.pop('status', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
 
         instance.save()
         return instance
@@ -484,78 +566,3 @@ class ContactSerializer(serializers.ModelSerializer):
             return valid.email  # Return the normalized email
         except EmailNotValidError as e:
             raise serializers.ValidationError("Invalid or non-existent email address.") from e
-
-class UserBookRiderSerializer(serializers.ModelSerializer):
-    client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the booking')
-    client_phone = serializers.ReadOnlyField(source='client.phone_number', help_text='The phone number of the client who made the booking')
-    booking_price = serializers.DecimalField(max_digits=10, decimal_places=2, help_text='Automatically calculated price based on distance')
-    rider_name = serializers.SerializerMethodField()
-    rider_phone_number = serializers.SerializerMethodField()
-    rider_address = serializers.SerializerMethodField()
-    rider_code = serializers.SerializerMethodField()
-    rider_nid = serializers.SerializerMethodField()
-    rider_image = serializers.SerializerMethodField()
-
-    class Meta:
-        model = BookRider
-        fields = [
-            'id', 'client', 'client_name', 'client_phone', 'pickup_address', 'pickup_lat', 'pickup_lng',
-            'delivery_address', 'delivery_lat', 'delivery_lng', 'estimated_distance_km', 'estimated_delivery_time',
-            'booking_price', 'payment_type',
-            'status', 'delete_status', 'deleted_by',
-            'created_at', 'updated_at',
-            'rider_name', 'rider_phone_number', 'rider_address',
-            'rider_code', 'rider_nid', 'rider_image'
-        ]
-        read_only_fields = ['id', 'client_name', 'client_phone', 'booking_price', 'created_at', 'updated_at',
-                            'rider_name', 'rider_phone_number', 'rider_address', 'rider_code', 'rider_nid', 'rider_image']
-        extra_kwargs = {
-            'client': {'write_only': True},
-            'deleted_by': {'write_only': True, 'required': False, 'allow_null': True},
-            'status': {'read_only': True},  # Make status read-only to prevent arbitrary changes
-        }
-
-    def get_rider_info(self, obj, attribute):
-        assignment = obj.assignments.first()
-        if assignment and assignment.rider:
-            rider = assignment.rider
-            return getattr(rider, attribute, None)
-        return None
-
-    def get_rider_image(self, obj):
-        image = self.get_rider_info(obj, 'image')
-        if image:
-            request = self.context.get('request')
-            if request is not None:
-                return request.build_absolute_uri(image.url)
-        return None
-
-    def get_rider_name(self, obj):
-        return self.get_rider_info(obj, 'name')
-
-    def get_rider_phone_number(self, obj):
-        return self.get_rider_info(obj, 'phone_number')
-
-    def get_rider_address(self, obj):
-        return self.get_rider_info(obj, 'address')
-
-    def get_rider_code(self, obj):
-        return self.get_rider_info(obj, 'code')
-
-    def get_rider_nid(self, obj):
-        return self.get_rider_info(obj, 'nid')
-
-    def create(self, validated_data):
-        book_rider = BookRider(**validated_data)
-        book_rider.save()
-        return book_rider
-
-    def update(self, instance, validated_data):
-        # Prevent status from being updated directly through the serializer
-        validated_data.pop('status', None)
-
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-
-        instance.save()
-        return instance
