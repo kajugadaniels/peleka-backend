@@ -830,3 +830,28 @@ class BookRiderUpdateView(generics.UpdateAPIView):
             "message": "Book rider updated successfully.",
             "data": serializer.data
         }, status=status.HTTP_200_OK)
+
+class DeleteBookRiderView(generics.DestroyAPIView):
+    """
+    API view to delete a Book Rider.
+    - Accessible only to authenticated users with the 'delete_bookrider' permission.
+    """
+    queryset = BookRider.objects.all()
+    serializer_class = BookRiderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        """
+        Retrieve and return the BookRider instance.
+        Check if the user has the permission to delete it.
+        """
+        try:
+            book_rider = BookRider.objects.get(pk=self.kwargs['pk'], delete_status=False)
+        except BookRider.DoesNotExist:
+            raise NotFound({'message': "Book rider not found or already deleted."})
+
+        # Check if the user has the 'delete_bookrider' permission
+        if not self.request.user.has_perm('web.delete_bookrider'):
+            raise PermissionDenied({'message': "You do not have permission to delete this book rider."})
+
+        return book_rider
