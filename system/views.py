@@ -968,3 +968,20 @@ class BookRiderAssignmentDetailView(generics.RetrieveAPIView):
         """
         # Call the default retrieve method to return the assignment details
         return self.retrieve(request, *args, **kwargs)
+
+class UpdateBookRiderAssignmentView(generics.UpdateAPIView):
+    """
+    API view to update a BookRiderAssignment.
+    - Only accessible to authenticated users with 'change_bookriderassignment' permission.
+    - Allows changing the rider but not the assignment's id or other fields.
+    """
+    queryset = BookRiderAssignment.objects.all().order_by('-assigned_at')
+    serializer_class = BookRiderAssignmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def put(self, request, *args, **kwargs):
+        # Check if the user has permission to change the book rider assignment
+        if not request.user.has_perm('system.change_bookriderassignment'):
+            raise PermissionDenied({"message": "You do not have permission to change this book rider assignment."})
+
+        return self.update(request, *args, **kwargs)
