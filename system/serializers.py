@@ -405,3 +405,18 @@ class BookRiderAssignmentCompleteSerializer(serializers.ModelSerializer):
         if self.instance.status != 'In Progress':
             raise serializers.ValidationError("Only assignments with status 'In Progress' can be marked as 'Completed'.")
         return attrs
+
+    def update(self, instance, validated_data):
+        """
+        Update the status of the BookRiderAssignment to 'Completed' and set the completed_at timestamp.
+        """
+        instance.status = 'Completed'
+        instance.completed_at = timezone.now()
+        instance.save()
+
+        # Update the related BookRider status
+        book_rider = instance.book_rider
+        book_rider.status = 'Completed'
+        book_rider.save()
+
+        return instance
