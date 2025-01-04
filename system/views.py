@@ -805,3 +805,28 @@ class BookRiderUpdateView(generics.UpdateAPIView):
             raise PermissionDenied({"message": "You do not have permission to change this book rider."})
 
         return self.update(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        # Retrieve the BookRider object
+        book_rider = self.get_object()
+        
+        # Store the original status to compare later
+        original_status = book_rider.status
+
+        # Use the serializer to update the object with validated data
+        serializer = self.get_serializer(book_rider, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        # Get the updated status
+        updated_status = serializer.validated_data.get('status', original_status)
+
+        # If the status has been updated to 'Completed' and was not 'Completed' before
+        if updated_status == 'Completed' and original_status != 'Completed':
+            # Optionally, perform additional actions here
+            pass  # Placeholder for any additional logic
+
+        return Response({
+            "message": "Book rider updated successfully.",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
