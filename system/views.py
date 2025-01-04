@@ -728,3 +728,38 @@ class BookRiderListView(generics.ListAPIView):
 
         # Call the default get method to list book riders
         return super().get(request, *args, **kwargs)
+
+class BookRiderCreateView(generics.CreateAPIView):
+    """
+    API view to create a new Book Rider.
+    - Accessible only to authenticated users with 'add_bookrider' permission.
+    """
+    queryset = BookRider.objects.all().order_by('-id')
+    serializer_class = BookRiderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        """
+        Handle the creation of a new book rider request.
+        """
+        # Check if the user has permission to add a book rider
+        if not request.user.has_perm('web.add_bookrider'):
+            raise PermissionDenied({'message': "You do not have permission to create book rider requests."})
+
+        # Deserialize the incoming data
+        serializer = self.get_serializer(data=request.data)
+        
+        # Check if the provided data is valid
+        serializer.is_valid(raise_exception=True)
+        
+        # Save the book rider and get the instance
+        book_rider = serializer.save()
+        
+        # Return a success response with the created data
+        return Response(
+            {
+                'message': 'Book rider request created successfully.',
+                'data': BookRiderSerializer(book_rider).data
+            },
+            status=status.HTTP_201_CREATED
+        )
