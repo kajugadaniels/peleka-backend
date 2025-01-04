@@ -490,3 +490,20 @@ class UserBookRiderCreateView(generics.CreateAPIView):
 
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
+
+class UserBookRiderDetailView(generics.RetrieveAPIView):
+    """
+    API view to retrieve a BookRider request by ID for the logged-in user.
+    - Accessible only to authenticated users.
+    """
+    serializer_class = UserBookRiderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return BookRider.objects.filter(client=self.request.user, delete_status=False)
+
+    def get_object(self):
+        try:
+            return self.get_queryset().get(pk=self.kwargs['pk'])
+        except BookRider.DoesNotExist:
+            raise NotFound({'message': "BookRider request not found."})
