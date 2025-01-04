@@ -1036,3 +1036,22 @@ class DeleteBookRiderAssignmentView(generics.DestroyAPIView):
             raise PermissionDenied({'message': "You do not have permission to delete this book rider assignment."})
 
         return assignment
+
+    def delete(self, request, *args, **kwargs):
+        """
+        Handle the deletion of a BookRiderAssignment by marking it as deleted.
+        """
+        assignment = self.get_object()
+        assignment.status = 'Cancelled'
+        assignment.cancelled_at = timezone.now()
+        assignment.save()
+
+        # Optionally, update the related BookRider status
+        book_rider = assignment.book_rider
+        book_rider.status = 'Cancelled'
+        book_rider.save()
+
+        return Response({
+            'message': "Book rider assignment cancelled successfully.",
+            'data': BookRiderAssignmentSerializer(assignment).data
+        }, status=status.HTTP_200_OK)
