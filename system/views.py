@@ -855,3 +855,17 @@ class DeleteBookRiderView(generics.DestroyAPIView):
             raise PermissionDenied({'message': "You do not have permission to delete this book rider."})
 
         return book_rider
+
+    def delete(self, request, *args, **kwargs):
+        """
+        Handle the deletion of a Book Rider by marking it as deleted.
+        """
+        book_rider = self.get_object()
+        book_rider.delete_status = True
+        book_rider.deleted_by = request.user
+        book_rider.save()
+
+        return Response({
+            'message': "Book rider marked as deleted successfully.",
+            'data': BookRiderSerializer(book_rider).data
+        }, status=status.HTTP_200_OK)
