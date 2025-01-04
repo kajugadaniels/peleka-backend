@@ -789,3 +789,19 @@ class BookRiderDetailView(generics.RetrieveAPIView):
         except BookRider.DoesNotExist:
             # Raise a NotFound exception if the object does not exist
             raise NotFound({'message': "Book rider not found."})
+
+class BookRiderUpdateView(generics.UpdateAPIView):
+    """
+    API view to update a BookRider.
+    - Only accessible to authenticated users with 'change_bookrider' permission.
+    """
+    queryset = BookRider.objects.all().order_by('-id')
+    serializer_class = BookRiderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def put(self, request, *args, **kwargs):
+        # Check if the user has permission to change the book rider
+        if not request.user.has_perm('web.change_bookrider'):
+            raise PermissionDenied({"message": "You do not have permission to change this book rider."})
+
+        return self.update(request, *args, **kwargs)
