@@ -717,4 +717,14 @@ class BookRiderListView(generics.ListAPIView):
         # If the user does not have the required permission, return an empty queryset
         return BookRider.objects.none()
 
-    
+    def get(self, request, *args, **kwargs):
+        """
+        Handle GET requests to list BookRiders.
+        - Checks user permissions before proceeding.
+        """
+        # Check if the user has permission to view book riders
+        if not request.user.is_superuser and not request.user.has_perm('web.view_bookrider'):
+            raise PermissionDenied({'message': "You do not have permission to view book riders."})
+
+        # Call the default get method to list book riders
+        return super().get(request, *args, **kwargs)
