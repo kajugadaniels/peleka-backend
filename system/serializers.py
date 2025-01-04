@@ -296,3 +296,57 @@ class BookRiderSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+class BookRiderAssignmentSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the BookRiderAssignment model.
+    Includes client information and rider information as read-only fields.
+    """
+    client_name = serializers.ReadOnlyField(source='book_rider.client.name', help_text='Name of the client who made the booking')
+    client_phone = serializers.ReadOnlyField(source='book_rider.client.phone_number', help_text='Phone number of the client who made the booking')
+    rider_name = serializers.ReadOnlyField(source='rider.name', help_text='Name of the assigned rider')
+    rider_phone_number = serializers.ReadOnlyField(source='rider.phone_number', help_text='Phone number of the assigned rider')
+    
+    class Meta:
+        model = BookRiderAssignment
+        fields = [
+            'id', 'book_rider', 'client_name', 'client_phone', 'rider', 'rider_name', 'rider_phone_number',
+            'assigned_at', 'in_progress_at', 'completed_at', 'cancelled_at', 'status',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'client_name', 'client_phone', 'rider_name', 'rider_phone_number',
+            'assigned_at', 'in_progress_at', 'completed_at', 'cancelled_at',
+            'created_at', 'updated_at'
+        ]
+        extra_kwargs = {
+            'book_rider': {'write_only': True},
+            'rider': {'write_only': True},
+            'status': {'required': False},
+        }
+
+    def create(self, validated_data):
+        """
+        Assign a rider to a BookRider request.
+        Automatically sets the assigned_at timestamp and updates the BookRider status to 'Confirmed'.
+        """
+        rider = validated_data.get('rider')
+        book_rider = validated_data.get('book_rider')
+        
+        # Check if the rider is available (no active assignments)
+        if BookRiderAssignment.objects.filter(rider=rider, status__in=['Pending', 'Confirmed', 'In Progress']).exists():
+            raise serializers.ValidationError("This rider is currently unavailable for a new assignment.")
+        
+        # Create the assignment
+        assignment = BookRiderAssignment.objects.create(
+            book_rider=book_rider,
+            rider=rider,
+            assigned_at=timezone.now(),
+            status='Confirmed'
+        )
+        
+        # Update the BookRider status
+        book_rider.status = 'Confirmed'
+        book_rider.save()
+        
+        return assignment
