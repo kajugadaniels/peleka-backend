@@ -961,3 +961,10 @@ class BookRiderAssignmentDetailView(generics.RetrieveAPIView):
             raise PermissionDenied({'message': "You do not have permission to view this book rider assignment."})
 
         return assignment
+
+    def get(self, request, *args, **kwargs):
+        """
+        Handle GET requests to retrieve book rider assignment details.
+        """
+        # Call the default retrieve method to return the assignment details
+        return self.retrieve(request, *args, **kwargs)
