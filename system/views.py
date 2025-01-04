@@ -936,3 +936,28 @@ class AddBookRiderAssignmentView(generics.CreateAPIView):
             },
             status=status.HTTP_201_CREATED
         )
+
+class BookRiderAssignmentDetailView(generics.RetrieveAPIView):
+    """
+    API view to retrieve details of a BookRiderAssignment by its ID.
+    - Accessible only to authenticated users with 'view_bookriderassignment' permission.
+    """
+    queryset = BookRiderAssignment.objects.all().order_by('-assigned_at')
+    serializer_class = BookRiderAssignmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        """
+        Retrieve and return the BookRiderAssignment instance by ID.
+        - Ensure the user has permission to view the assignment.
+        """
+        try:
+            assignment = BookRiderAssignment.objects.get(pk=self.kwargs['pk'], book_rider__delete_status=False)
+        except BookRiderAssignment.DoesNotExist:
+            raise NotFound({'message': "Book rider assignment not found."})
+
+        # Check if the user has permission to view the assignment
+        if not self.request.user.is_superuser and not self.request.user.has_perm('system.view_bookriderassignment'):
+            raise PermissionDenied({'message': "You do not have permission to view this book rider assignment."})
+
+        return assignment
