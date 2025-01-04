@@ -286,3 +286,13 @@ class BookRiderSerializer(serializers.ModelSerializer):
         book_rider = BookRider(**validated_data)
         book_rider.save()
         return book_rider
+
+    def update(self, instance, validated_data):
+        """
+        Update an existing BookRider instance.
+        Prevents modification of read-only fields.
+        """
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
