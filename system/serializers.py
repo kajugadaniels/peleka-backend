@@ -350,3 +350,37 @@ class BookRiderAssignmentSerializer(serializers.ModelSerializer):
         book_rider.save()
         
         return assignment
+
+    def update(self, instance, validated_data):
+        """
+        Update an existing BookRiderAssignment instance.
+        Handles status transitions and timestamp updates.
+        """
+        status = validated_data.get('status', instance.status)
+        
+        # Allow only 'rider' to be updated
+        if 'rider' in validated_data:
+            new_rider = validated_data.pop('rider')
+            # Check if the new rider is available
+            if BookRiderAssignment.objects.filter(rider=new_rider, status__in=['Pending', 'Confirmed', 'In Progress']).exists():
+                raise serializers.ValidationError("The new rider is currently unavailable for assignment.")
+            instance.rider = new_rider
+            instance.assigned_at = timezone.now()
+        
+        if status != instance.status:
+            if status == 'In Progress':
+                instance.in_progress_at = timezone.now()
+            elif status == 'Completed':
+                instance.completed_at = timezone.now()
+                # Update the BookRider status
+                instance.book_rider.status = 'Completed'
+                instance.book_rider.save()
+            elif status == 'Cancelled':
+                instance.cancelled_at = timezone.now()
+                # Update the BookRider status
+                instance.book_rider.status = 'Cancelled'
+                instance.book_rider.save()
+        
+        instance.status = status
+        instance.save()
+        return instance
