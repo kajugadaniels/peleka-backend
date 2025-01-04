@@ -1,10 +1,11 @@
 import os
+from web.models import *
 from account.models import *
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
-from imagekit.models import ProcessedImageField
 from imagekit.processors import ResizeToFill
+from imagekit.models import ProcessedImageField
 
 def rider_image_path(instance, filename):
     base_filename, file_extension = os.path.splitext(filename)
@@ -91,7 +92,7 @@ class DeliveryRequest(models.Model):
     package_description = models.TextField(blank=True, null=True, help_text='A description of the package to be delivered')
     recipient_name = models.CharField(max_length=255, blank=True, null=True, help_text='Name of the recipient')
     recipient_phone = models.CharField(max_length=15, blank=True, null=True, help_text='Phone number of the recipient')
-    estimated_distance_km = models.FloatField(blank=True, null=True, help_text='Estimated distance of the delivery in kilometers')
+    estimated_distance_km = models.CharField(max_length=15, blank=True, null=True, help_text='Estimated distance of the delivery in kilometers')
     estimated_delivery_time = models.CharField(max_length=15, blank=True, null=True, help_text='The estimated time for the package to be delivered')
     value_of_product = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text='The value of the product being delivered in RWF')
     delivery_price = models.CharField(max_length=100, null=True, blank=True, help_text='The calculated price for the delivery in RWF')
@@ -137,3 +138,20 @@ class RiderDelivery(models.Model):
 
     def __str__(self):
         return f"Rider: {self.rider.name} - Status: {self.delivered}"
+
+class BookRiderAssignment(models.Model):
+    book_rider = models.ForeignKey(BookRider, on_delete=models.CASCADE, related_name='assignments', help_text='The booking request to which the rider is assigned')
+    rider = models.ForeignKey(Rider, on_delete=models.CASCADE, related_name='book_rider_assignments', help_text='The rider assigned to the booking')
+    assigned_at = models.DateTimeField(blank=True, null=True, help_text='Timestamp when the rider was assigned')
+    in_progress_at = models.DateTimeField(blank=True, null=True, help_text='Timestamp when the booking started')
+    completed_at = models.DateTimeField(blank=True, null=True, help_text='Timestamp when the booking was completed')
+    cancelled_at = models.DateTimeField(blank=True, null=True, help_text='Timestamp when the booking was cancelled')
+    status = models.CharField(max_length=20, choices=BookRider.STATUS_CHOICES, default='Pending', help_text='Current status of the assignment')
+
+    class Meta:
+        ordering = ['-assigned_at']
+        verbose_name = 'Book Rider Assignment'
+        verbose_name_plural = 'Book Rider Assignments'
+
+    def __str__(self):
+        return f"Assignment for {self.book_rider} to Rider: {self.rider.name} - Status: {self.status}"
