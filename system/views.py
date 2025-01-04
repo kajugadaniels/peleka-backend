@@ -1092,3 +1092,13 @@ class CompleteBookRiderAssignmentView(generics.UpdateAPIView):
             },
             status=status.HTTP_200_OK
         )
+
+    def get_object(self):
+        """
+        Retrieve and return the BookRiderAssignment instance by ID.
+        - Ensure the assignment is not deleted.
+        """
+        try:
+            return BookRiderAssignment.objects.get(pk=self.kwargs['pk'], book_rider__delete_status=False)
+        except BookRiderAssignment.DoesNotExist:
+            raise NotFound({'message': "Book rider assignment not found."})
