@@ -47,6 +47,12 @@ class BookRider(models.Model):
         ('Completed', 'Completed'),
         ('Cancelled', 'Cancelled'),
     ]
+    
+    PAYMENT_STATUS_CHOICES = [
+        ('Pending', 'Pending'),
+        ('Successful', 'Successful'),
+        ('Failed', 'Failed'),
+    ]
 
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='book_riders', help_text='The client who is booking the rider')
     pickup_address = models.TextField(blank=True, null=True, help_text='The address where the rider should pick up')
@@ -62,13 +68,16 @@ class BookRider(models.Model):
     booking_price = models.CharField(max_length=100, null=True, blank=True, help_text='Calculated price for booking the rider in RWF')
     payment_type = models.CharField(blank=True, null=True, max_length=255, help_text='Payment method for the booking')
     
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='Pending', help_text='Current status of the payment')
+    tx_ref = models.CharField(max_length=255, unique=True, null=True, blank=True, help_text='Transaction reference from Flutterwave')
+    currency = models.CharField(max_length=10, default='RWF', help_text='Currency used in the transaction')
+    
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending', help_text='Current status of the booking request')
     delete_status = models.BooleanField(default=False, help_text='Indicates if the booking request has been deleted')
     deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='deleted_book_riders', help_text='User who deleted the booking request')
     
     created_at = models.DateTimeField(auto_now_add=True, help_text='Timestamp when the booking was created')
-    updated_at = models.DateTimeField(
-        auto_now=True, help_text='Timestamp when the booking was last updated')
+    updated_at = models.DateTimeField(auto_now=True, help_text='Timestamp when the booking was last updated')
 
     class Meta:
         ordering = ['-created_at']
