@@ -79,6 +79,14 @@ class DeliveryRequest(models.Model):
         ('Cancelled', 'Cancelled'),
     ]
 
+    PAYMENT_STATUS_CHOICES = [
+        ('Pending', 'Pending'),
+        ('Successful', 'Successful'),
+        ('Failed', 'Failed'),
+        ('Cancelled', 'Cancelled'),
+        ('Refunded', 'Refunded'),
+    ]
+
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='delivery_requests', help_text='The client who requested the delivery')
     pickup_address = models.TextField(blank=True, null=True, help_text='The address where the package should be picked up')
     pickup_lat = models.CharField(max_length=100, null=True, blank=True, help_text='Latitude of the pickup location')
@@ -107,6 +115,9 @@ class DeliveryRequest(models.Model):
         blank=True,
         help_text='An optional image of the package'
     )
+    
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='Pending', help_text='Status of the payment')
+    tx_ref = models.CharField(max_length=255, null=True, blank=True, unique=True, help_text='Unique transaction reference from Flutterwave')
 
     status = models.CharField(max_length=20, choices=REQUEST_STATUS_CHOICES, default='Pending', help_text='The current status of the delivery request')
     delete_status = models.BooleanField(default=False, help_text='Indicates if the delivery request has been deleted')
