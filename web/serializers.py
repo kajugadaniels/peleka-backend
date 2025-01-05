@@ -145,18 +145,20 @@ class UserDeliveryRequestSerializer(serializers.ModelSerializer):
             'id', 'client', 'client_name', 'client_phone', 'pickup_address', 'pickup_lat', 'pickup_lng',
             'delivery_address', 'delivery_lat', 'delivery_lng', 'package_name', 'package_description',
             'recipient_name', 'recipient_phone', 'estimated_distance_km', 'estimated_delivery_time', 
-            'value_of_product', 'delivery_price', 'image', 'status', 'payment_type', 
+            'value_of_product', 'delivery_price', 'image', 'status', 'payment_type', 'payment_status', 'tx_ref', 
             'created_at', 'updated_at', 'rider_name', 'rider_phone_number', 'rider_address', 
             'rider_code', 'rider_nid', 'rider_image'
         ]
         read_only_fields = [
             'id', 'client_name', 'client_phone', 'delivery_price', 'created_at', 'updated_at',
             'rider_name', 'rider_phone_number', 'rider_address', 'rider_code', 'rider_nid', 'rider_image',
-            'status'  # Make status read-only to prevent arbitrary changes
+            'status'
         ]
         extra_kwargs = {
             'client': {'write_only': True},
             'image': {'required': False, 'allow_null': True},
+            'payment_status': {'required': False, 'allow_null': True},
+            'tx_ref': {'write_only': True},
         }
 
     def get_rider_info(self, obj, attribute):
