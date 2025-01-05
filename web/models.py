@@ -71,7 +71,7 @@ class BookRider(models.Model):
     payment_type = models.CharField(blank=True, null=True, max_length=255, help_text='Payment method for the booking')
     
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='Pending', help_text='Status of the payment')
-    tx_ref = models.CharField(max_length=255, unique=True, help_text='Unique transaction reference from Flutterwave')
+    tx_ref = models.CharField(max_length=255, null=True, blank=True, unique=True, help_text='Unique transaction reference from Flutterwave')
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending', help_text='Current status of the booking request')
     delete_status = models.BooleanField(default=False, help_text='Indicates if the booking request has been deleted')
