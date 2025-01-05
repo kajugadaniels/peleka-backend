@@ -315,7 +315,6 @@ class UserBookRiderSerializer(serializers.ModelSerializer):
     rider_image = serializers.SerializerMethodField()
     payment_status = serializers.CharField(source='payment_status', read_only=True, help_text='Current status of the payment (Pending, Successful, Failed)')
     tx_ref = serializers.CharField(source='tx_ref', read_only=True, help_text='Unique transaction reference from Flutterwave')
-    currency = serializers.CharField(source='currency', read_only=True, default='RWF', help_text='Currency used in the transaction')
     mock_status = serializers.ChoiceField(choices=[('success', 'Success'), ('failed', 'Failed')], write_only=True, required=False, help_text='Mock payment status for testing: success or failed')
     
     class Meta:
@@ -324,16 +323,15 @@ class UserBookRiderSerializer(serializers.ModelSerializer):
             'id', 'client', 'client_name', 'client_phone', 'pickup_address', 'pickup_lat', 'pickup_lng',
             'delivery_address', 'delivery_lat', 'delivery_lng', 'estimated_distance_km', 'estimated_delivery_time',
             'booking_price', 'payment_type',
-            'payment_status', 'tx_ref', 'currency',
+            'payment_status', 'tx_ref'
             'status', 'delete_status', 'deleted_by',
             'created_at', 'updated_at',
             'rider_name', 'rider_phone_number', 'rider_address',
             'rider_code', 'rider_nid', 'rider_image',
-            'mock_status',
         ]
         read_only_fields = [
             'id', 'client_name', 'client_phone', 'booking_price',
-            'payment_status', 'tx_ref', 'currency',
+            'payment_status', 'tx_ref'
             'created_at', 'updated_at',
             'rider_name', 'rider_phone_number', 'rider_address',
             'rider_code', 'rider_nid', 'rider_image'

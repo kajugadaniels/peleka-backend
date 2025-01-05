@@ -47,11 +47,13 @@ class BookRider(models.Model):
         ('Completed', 'Completed'),
         ('Cancelled', 'Cancelled'),
     ]
-    
+
     PAYMENT_STATUS_CHOICES = [
         ('Pending', 'Pending'),
         ('Successful', 'Successful'),
         ('Failed', 'Failed'),
+        ('Cancelled', 'Cancelled'),
+        ('Refunded', 'Refunded'),
     ]
 
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='book_riders', help_text='The client who is booking the rider')
@@ -68,10 +70,8 @@ class BookRider(models.Model):
     booking_price = models.CharField(max_length=100, null=True, blank=True, help_text='Calculated price for booking the rider in RWF')
     payment_type = models.CharField(blank=True, null=True, max_length=255, help_text='Payment method for the booking')
     
-    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='Pending', help_text='Current status of the payment')
-    tx_ref = models.CharField(max_length=255, unique=True, null=True, blank=True, help_text='Transaction reference from Flutterwave')
-    mock_status = models.CharField(max_length=255, unique=True, null=True, blank=True, help_text='Mock reference from Flutterwave')
-    currency = models.CharField(max_length=10, default='RWF', help_text='Currency used in the transaction')
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='Pending', help_text='Status of the payment')
+    tx_ref = models.CharField(max_length=255, unique=True, help_text='Unique transaction reference from Flutterwave')
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending', help_text='Current status of the booking request')
     delete_status = models.BooleanField(default=False, help_text='Indicates if the booking request has been deleted')

@@ -36,7 +36,8 @@ class BookRiderAdmin(admin.ModelAdmin):
     list_display = (
         'id', 'client', 'pickup_address', 'delivery_address',
         'estimated_distance_km', 'estimated_delivery_time',
-        'booking_price', 'payment_type', 'status', 'delete_status'
+        'payment_status', 'tx_ref', 'booking_price',
+        'payment_type', 'status', 'delete_status'
     )
     search_fields = (
         'client__username', 'pickup_address', 'delivery_address',
