@@ -18,7 +18,7 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'client', 'client_name', 'client_phone', 'pickup_address', 'pickup_lat', 'pickup_lng',
             'delivery_address', 'delivery_lat', 'delivery_lng', 'package_name', 'package_description',
-            'recipient_name', 'recipient_phone', 'estimated_distance_km', 'estimated_delivery_time', 
+            'recipient_name', 'recipient_phone', 'estimated_distance_km', 'estimated_delivery_time', 'payment_status', 'tx_ref',
             'value_of_product', 'delivery_price', 'image', 'status', 'rider_name', 'rider_phone_number', 'rider_address', 
             'rider_code', 'rider_nid', 'rider_image', 'payment_type', 'created_at', 'updated_at'
         ]
@@ -26,6 +26,8 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'client': {'write_only': True},
             'image': {'required': False, 'allow_null': True},
+            'payment_status': {'required': False, 'allow_null': True},
+            'tx_ref': {'write_only': True},
         }
 
     def get_rider_info(self, obj, attribute):

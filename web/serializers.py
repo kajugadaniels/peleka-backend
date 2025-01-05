@@ -320,7 +320,7 @@ class UserBookRiderSerializer(serializers.ModelSerializer):
             'id', 'client', 'client_name', 'client_phone', 'pickup_address', 'pickup_lat', 'pickup_lng',
             'delivery_address', 'delivery_lat', 'delivery_lng', 'estimated_distance_km', 'estimated_delivery_time',
             'booking_price', 'payment_type',
-            'payment_status', 'tx_ref',  # Added fields
+            'payment_status', 'tx_ref',
             'status', 'delete_status', 'deleted_by',
             'created_at', 'updated_at',
             'rider_name', 'rider_phone_number', 'rider_address',
@@ -333,9 +333,9 @@ class UserBookRiderSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'client': {'write_only': True},
             'deleted_by': {'write_only': True, 'required': False, 'allow_null': True},
-            'status': {'read_only': True},  # Make status read-only to prevent arbitrary changes
-            'payment_status': {'required': False, 'allow_null': True},  # Allow it to be set via serializer
-            'tx_ref': {'write_only': True},  # Receive it from frontend
+            'status': {'read_only': True},
+            'payment_status': {'required': False, 'allow_null': True},
+            'tx_ref': {'write_only': True},
         }
 
     def get_rider_info(self, obj, attribute):
