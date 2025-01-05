@@ -15,13 +15,11 @@ class ReadOnlyAdmin(admin.ModelAdmin):
     def get_readonly_fields(self, request, obj=None):
         return [field.name for field in self.model._meta.fields]
 
-
 @admin.register(RequestDemo)
 class RequestDemoAdmin(ReadOnlyAdmin):
     list_display = ('id', 'name', 'company_name', 'contact_number', 'email', 'created_at')
     search_fields = ('name', 'company_name', 'contact_number', 'email')
     ordering = ('-created_at',)
-
 
 @admin.register(Contact)
 class ContactAdmin(ReadOnlyAdmin):
@@ -30,6 +28,19 @@ class ContactAdmin(ReadOnlyAdmin):
     list_filter = ('submitted_at',)
     ordering = ('-submitted_at',)
 
+@admin.register(DeliveryRequest)
+class DeliveryRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'client', 'package_name', 'estimated_distance_km', 'delivery_price',
+        'payment_status', 'tx_ref', 'status', 'payment_type'
+    )
+    list_filter = ('status', 'payment_type', 'created_at', 'updated_at')
+    search_fields = (
+        'client__name', 'client__email', 'package_name', 'recipient_name',
+        'recipient_phone'
+    )
+    ordering = ('-created_at',)
+    list_select_related = ('client',)
 
 @admin.register(BookRider)
 class BookRiderAdmin(admin.ModelAdmin):
@@ -45,7 +56,6 @@ class BookRiderAdmin(admin.ModelAdmin):
     )
     list_filter = ('status', 'delete_status', 'created_at')
     ordering = ('-created_at',)
-
 
 @admin.register(BookRiderAssignment)
 class BookRiderAssignmentAdmin(admin.ModelAdmin):

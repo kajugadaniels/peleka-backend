@@ -42,21 +42,6 @@ class RiderAdmin(admin.ModelAdmin):
 #     ordering = ('BASE_DISTANCE',)
 
 
-@admin.register(DeliveryRequest)
-class DeliveryRequestAdmin(ReadOnlyAdmin):
-    list_display = (
-        'id', 'client', 'package_name', 'estimated_distance_km', 'delivery_price',
-        'status', 'payment_type', 'created_at', 'updated_at'
-    )
-    list_filter = ('status', 'payment_type', 'created_at', 'updated_at')
-    search_fields = (
-        'client__name', 'client__email', 'package_name', 'recipient_name',
-        'recipient_phone'
-    )
-    ordering = ('-created_at',)
-    list_select_related = ('client',)
-
-
 @admin.register(RiderDelivery)
 class RiderDeliveryAdmin(ReadOnlyAdmin):
     list_display = (
