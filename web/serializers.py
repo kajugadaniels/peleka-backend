@@ -304,8 +304,8 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         return instance
 
 class UserBookRiderSerializer(serializers.ModelSerializer):
-    client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the booking')
-    client_phone = serializers.ReadOnlyField(source='client.phone_number', help_text='The phone number of the client who made the booking')
+    client_name = serializers.ReadOnlyField(source='client.username', help_text='The name of the client who made the booking')
+    client_phone = serializers.ReadOnlyField(source='client.profile.phone_number', help_text='The phone number of the client who made the booking')
     booking_price = serializers.DecimalField(max_digits=10, decimal_places=2, help_text='Automatically calculated price based on distance')
     rider_name = serializers.SerializerMethodField()
     rider_phone_number = serializers.SerializerMethodField()
@@ -313,24 +313,35 @@ class UserBookRiderSerializer(serializers.ModelSerializer):
     rider_code = serializers.SerializerMethodField()
     rider_nid = serializers.SerializerMethodField()
     rider_image = serializers.SerializerMethodField()
-
+    payment_status = serializers.CharField(source='payment_status', read_only=True, help_text='Current status of the payment (Pending, Successful, Failed)')
+    tx_ref = serializers.CharField(source='tx_ref', read_only=True, help_text='Unique transaction reference from Flutterwave')
+    currency = serializers.CharField(source='currency', read_only=True, default='RWF', help_text='Currency used in the transaction')
+    mock_status = serializers.ChoiceField(choices=[('success', 'Success'), ('failed', 'Failed')], write_only=True, required=False, help_text='Mock payment status for testing: success or failed')
+    
     class Meta:
         model = BookRider
         fields = [
             'id', 'client', 'client_name', 'client_phone', 'pickup_address', 'pickup_lat', 'pickup_lng',
             'delivery_address', 'delivery_lat', 'delivery_lng', 'estimated_distance_km', 'estimated_delivery_time',
             'booking_price', 'payment_type',
+            'payment_status', 'tx_ref', 'currency',
             'status', 'delete_status', 'deleted_by',
+            'created_at', 'updated_at',
+            'rider_name', 'rider_phone_number', 'rider_address',
+            'rider_code', 'rider_nid', 'rider_image',
+            'mock_status',
+        ]
+        read_only_fields = [
+            'id', 'client_name', 'client_phone', 'booking_price',
+            'payment_status', 'tx_ref', 'currency',
             'created_at', 'updated_at',
             'rider_name', 'rider_phone_number', 'rider_address',
             'rider_code', 'rider_nid', 'rider_image'
         ]
-        read_only_fields = ['id', 'client_name', 'client_phone', 'booking_price', 'created_at', 'updated_at',
-                            'rider_name', 'rider_phone_number', 'rider_address', 'rider_code', 'rider_nid', 'rider_image']
         extra_kwargs = {
             'client': {'write_only': True},
             'deleted_by': {'write_only': True, 'required': False, 'allow_null': True},
-            'status': {'read_only': True},  # Make status read-only to prevent arbitrary changes
+            'status': {'read_only': True},
         }
 
     def get_rider_info(self, obj, attribute):
@@ -364,17 +375,50 @@ class UserBookRiderSerializer(serializers.ModelSerializer):
         return self.get_rider_info(obj, 'nid')
 
     def create(self, validated_data):
-        book_rider = BookRider(**validated_data)
-        book_rider.save()
+        """
+        Override the create method to automatically generate tx_ref and set payment_status.
+        """
+        # Extract mock_status if provided (for testing purposes)
+        mock_status = validated_data.pop('mock_status', None)
+        
+        # Generate a unique transaction reference
+        unique_id = uuid.uuid4().hex[:10]
+        tx_ref = f"{unique_id}"
+        
+        # Determine payment_status based on mock_status
+        if mock_status == 'success':
+            tx_ref += "_success_mock"
+            payment_status = 'Successful'
+        elif mock_status == 'failed':
+            tx_ref += "_failed_mock"
+            payment_status = 'Failed'
+        else:
+            payment_status = 'Pending'
+        
+        # Create the BookRider instance with the generated tx_ref and payment_status
+        book_rider = BookRider.objects.create(
+            tx_ref=tx_ref,
+            payment_status=payment_status,
+            currency='RWF',
+            **validated_data
+        )
+        
         return book_rider
 
     def update(self, instance, validated_data):
-        # Prevent status from being updated directly through the serializer
+        """
+        Override the update method to prevent modification of payment-related fields.
+        """
+        # Prevent status and payment fields from being updated directly through the serializer
         validated_data.pop('status', None)
-
+        validated_data.pop('payment_status', None)
+        validated_data.pop('tx_ref', None)
+        validated_data.pop('currency', None)
+        validated_data.pop('mock_status', None)
+        
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-
+        
         instance.save()
         return instance
 
