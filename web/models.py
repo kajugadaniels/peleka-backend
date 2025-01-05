@@ -70,6 +70,7 @@ class BookRider(models.Model):
     
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='Pending', help_text='Current status of the payment')
     tx_ref = models.CharField(max_length=255, unique=True, null=True, blank=True, help_text='Transaction reference from Flutterwave')
+    mock_status = models.CharField(max_length=255, unique=True, null=True, blank=True, help_text='Mock reference from Flutterwave')
     currency = models.CharField(max_length=10, default='RWF', help_text='Currency used in the transaction')
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending', help_text='Current status of the booking request')
