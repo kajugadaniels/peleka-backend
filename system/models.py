@@ -159,6 +159,9 @@ class BookRiderAssignment(models.Model):
     cancelled_at = models.DateTimeField(blank=True, null=True, help_text='Timestamp when the booking was cancelled')
     status = models.CharField(max_length=20, choices=BookRider.STATUS_CHOICES, default='Pending', help_text='Current status of the assignment')
 
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         ordering = ['-assigned_at']
         verbose_name = 'Book Rider Assignment'
