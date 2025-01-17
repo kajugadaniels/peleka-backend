@@ -155,3 +155,5 @@ def create_wallet_transactions_for_bookriderassignment(sender, instance, created
                 description=f"Boss share from BookRiderAssignment {instance.id} (BookRider {instance.book_rider.id})",
                 reference=str(instance.id)
             )
+        except Wallet.DoesNotExist:
+            pass
