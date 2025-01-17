@@ -376,37 +376,35 @@ class BookRiderAssignmentSerializer(serializers.ModelSerializer):
         return assignment
 
     def update(self, instance, validated_data):
-        """
-        Update an existing BookRiderAssignment instance.
-        Handles status transitions and timestamp updates.
-        """
-        status = validated_data.get('status', instance.status)
-        
-        # Allow only 'rider' to be updated
-        if 'rider' in validated_data:
-            new_rider = validated_data.pop('rider')
-            # Check if the new rider is available
-            if BookRiderAssignment.objects.filter(rider=new_rider, status__in=['Pending', 'Confirmed', 'In Progress']).exists():
-                raise serializers.ValidationError("The new rider is currently unavailable for assignment.")
-            instance.rider = new_rider
-            instance.assigned_at = timezone.now()
-        
-        if status != instance.status:
-            if status == 'In Progress':
-                instance.in_progress_at = timezone.now()
-            elif status == 'Completed':
-                instance.completed_at = timezone.now()
-                # Update the BookRider status
-                instance.book_rider.status = 'Completed'
-                instance.book_rider.save()
-            elif status == 'Cancelled':
-                instance.cancelled_at = timezone.now()
-                # Update the BookRider status
-                instance.book_rider.status = 'Cancelled'
-                instance.book_rider.save()
-        
-        instance.status = status
-        instance.save()
+        original_status = instance.status
+        instance = super().update(instance, validated_data)
+        if instance.status == 'Completed' and original_status != 'Completed':
+            # Retrieve booking price from the associated BookRider
+            if instance.book_rider and instance.book_rider.booking_price:
+                price = Decimal(instance.book_rider.booking_price)
+            else:
+                price = Decimal('0.00')
+            rider_amount = price * Decimal('0.90')
+            rider = instance.rider
+            if rider.commissioner:
+                commissioner_amount = price * Decimal('0.03')
+                boss_amount = price * Decimal('0.07')
+            else:
+                commissioner_amount = Decimal('0.00')
+                boss_amount = price * Decimal('0.10')
+            # Update rider wallet
+            rider_wallet = Wallet.objects.filter(owner=rider.user, wallet_type='rider').first()
+            if rider_wallet:
+                rider_wallet.credit(rider_amount, description=f"Credit from book rider assignment {instance.book_rider.id}")
+            # Update commissioner wallet if available
+            if commissioner_amount > 0:
+                commissioner_wallet = Wallet.objects.filter(owner=rider.commissioner, wallet_type='commissioner').first()
+                if commissioner_wallet:
+                    commissioner_wallet.credit(commissioner_amount, description=f"Credit from book rider assignment {instance.book_rider.id} (Rider: {rider.name})")
+            # Update boss wallet
+            boss_wallet = Wallet.objects.filter(wallet_type='boss').first()
+            if boss_wallet:
+                boss_wallet.credit(boss_amount, description=f"Credit from book rider assignment {instance.book_rider.id}")
         return instance
 
 class BookRiderAssignmentCompleteSerializer(serializers.ModelSerializer):
