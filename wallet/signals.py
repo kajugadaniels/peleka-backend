@@ -91,3 +91,42 @@ def create_wallet_transactions_for_riderdelivery(sender, instance, created, **kw
             )
         except Wallet.DoesNotExist:
             pass
+
+@receiver(post_save, sender=BookRiderAssignment)
+def create_wallet_transactions_for_bookriderassignment(sender, instance, created, **kwargs):
+    """
+    When a BookRiderAssignment is marked as Completed,
+    create wallet transactions similarly using the booking_price from BookRider.
+    """
+    # Process only when status is completed and not previously processed.
+    if instance.status == 'Completed':
+        if hasattr(instance, 'wallet_transaction_created') and instance.wallet_transaction_created:
+            return
+        instance.wallet_transaction_created = True
+
+        # Get price from related BookRider (booking_price)
+        booking_price = get_amount_from_str(instance.book_rider.booking_price)
+        if booking_price <= 0:
+            return
+
+        # Calculate splits:
+        rider_amount = booking_price * RIDER_SHARE
+        rider_obj = instance.rider  # instance.rider is a Rider instance
+        if rider_obj.commissioner:
+            commissioner_amount = booking_price * COMMISSIONER_SHARE
+            boss_amount = booking_price * BOSS_SHARE_WITH_COMMISSIONER
+        else:
+            commissioner_amount = Decimal('0.00')
+            boss_amount = booking_price * BOSS_SHARE_NO_COMMISSIONER
+
+        # Create transaction for rider wallet
+        if rider_obj.user and hasattr(rider_obj.user, 'wallet'):
+            wallet = rider_obj.user.wallet
+            wallet.credit(rider_amount)
+            WalletTransaction.objects.create(
+                wallet=wallet,
+                amount=rider_amount,
+                transaction_type='credit',
+                description=f"Booking Payment from BookRider {instance.book_rider.id} via Assignment {instance.id}",
+                reference=str(instance.id)
+            )
