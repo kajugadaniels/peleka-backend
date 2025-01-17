@@ -41,6 +41,7 @@ class Rider(models.Model):
         null=True,
         blank=True
     )
+    # NEW fields:
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -62,7 +63,7 @@ class Rider(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='boss_riders',
+        related_name='commissioner_riders',
         help_text="Optional: The boss agent for this rider."
     )
     created_at = models.DateTimeField(default=timezone.now)
