@@ -175,6 +175,8 @@ class RiderSerializer(serializers.ModelSerializer):
     Includes auto-generated, read-only code based on name initials and a unique 8-digit number.
     Also includes delivery history with detailed information.
     """
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False)
+    commissioner = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False, allow_null=True)
     image = serializers.ImageField(required=False)
     permit_image = serializers.ImageField(required=False)
     code = serializers.CharField(read_only=True)  # Code is read-only
@@ -182,7 +184,7 @@ class RiderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Rider
-        fields = ['id', 'name', 'phone_number', 'address', 'code', 'nid', 'image', 'permit_image', 'plate_number', 'insurance', 'delivery_history']
+        fields = ['id', 'user', 'commissioner', 'name', 'phone_number', 'address', 'code', 'nid', 'image', 'permit_image', 'plate_number', 'insurance', 'delivery_history']
         read_only_fields = ['code', 'delivery_history']
 
     def generate_unique_code(self, name):
