@@ -57,6 +57,14 @@ class Rider(models.Model):
         related_name='commissioner_riders',
         help_text="Optional: The commission agent for this rider."
     )
+    boss = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='boss_riders',
+        help_text="Optional: The boss agent for this rider."
+    )
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
