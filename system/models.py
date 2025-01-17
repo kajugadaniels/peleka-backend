@@ -41,7 +41,6 @@ class Rider(models.Model):
         null=True,
         blank=True
     )
-    # NEW fields:
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
