@@ -1,5 +1,6 @@
 import random
 from system.models import *
+from wallets.models import *
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
@@ -136,23 +137,83 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
     def validate(self, data):
         """Ensure that a rider can be assigned only if they are available."""
         rider = self.initial_data.get('rider')
-        if rider and RiderDelivery.objects.filter(rider=rider).exclude(delivered=True).exists():
+        if rider and self.Meta.model.objects.filter(rider=rider).exclude(delivered=True).exists():
             raise serializers.ValidationError("Rider is currently unavailable for a new delivery assignment.")
         return data
 
     def create(self, validated_data):
-        """Create a new RiderDelivery instance with assigned_at and in_progress_at set to current time."""
+        """
+        Create a new RiderDelivery instance with assigned_at and in_progress_at set to current time.
+        After creation, calculate the wallet shares based on delivery_price:
+          - Rider gets 90%
+          - Commissioner gets 3% (if exists) otherwise boss gets an extra 3% (i.e. boss gets 10% total)
+          - Boss gets 7% (or 10% if no commissioner)
+        Then update (or create) the Transaction entry and record TransactionHistory.
+        """
+        # Set delivery fields
         validated_data['delivered'] = False
-        validated_data['assigned_at'] = timezone.now()
-        # validated_data['in_progress_at'] = timezone.now()
+        now = timezone.now()
+        validated_data['assigned_at'] = now
+        validated_data['in_progress_at'] = now
 
-        # Update the delivery request status
+        # Optionally update delivery_request status
         delivery_request = validated_data.get('delivery_request')
         if delivery_request:
             delivery_request.status = 'Accepted'
             delivery_request.save()
 
-        return super().create(validated_data)
+        # Create the RiderDelivery instance
+        instance = super().create(validated_data)
+
+        # --- Wallet Dispatch Logic ---
+        # Get delivery_price from the delivery request and convert to Decimal
+        try:
+            price = Decimal(instance.delivery_request.delivery_price)
+        except Exception:
+            price = Decimal('0.00')
+
+        rider = instance.rider
+        if rider:
+            # Calculate shares depending on whether a commissioner is set
+            if rider.commissioner:
+                rider_share = price * Decimal('0.90')
+                commission_share = price * Decimal('0.03')
+                boss_share = price * Decimal('0.07')
+            else:
+                rider_share = price * Decimal('0.90')
+                commission_share = Decimal('0.00')
+                boss_share = price * Decimal('0.10')
+
+            # Update (or create) the Transaction record for this rider
+            transaction, created = Transaction.objects.get_or_create(rider=rider)
+            transaction.rider_total += rider_share
+            transaction.boss_total += boss_share
+            if rider.commissioner:
+                transaction.commissioner_total += commission_share
+            transaction.save()
+
+            # Record the transaction history
+            TransactionHistory.objects.create(
+                transaction=transaction,
+                role='rider',
+                amount=rider_share,
+                description=f"Delivery assigned via RiderDelivery id {instance.id}"
+            )
+            if rider.commissioner:
+                TransactionHistory.objects.create(
+                    transaction=transaction,
+                    role='commissioner',
+                    amount=commission_share,
+                    description=f"Commission from RiderDelivery id {instance.id}"
+                )
+            TransactionHistory.objects.create(
+                transaction=transaction,
+                role='boss',
+                amount=boss_share,
+                description=f"Delivery assigned via RiderDelivery id {instance.id}"
+            )
+
+        return instance
 
     def update(self, instance, validated_data):
         """Handle the update logic to change the rider's delivery assignment."""
