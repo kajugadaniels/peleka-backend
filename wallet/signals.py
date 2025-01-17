@@ -130,3 +130,16 @@ def create_wallet_transactions_for_bookriderassignment(sender, instance, created
                 description=f"Booking Payment from BookRider {instance.book_rider.id} via Assignment {instance.id}",
                 reference=str(instance.id)
             )
+
+        # Create transaction for commissioner wallet, if exists
+        if rider_obj.commissioner:
+            if hasattr(rider_obj.commissioner, 'wallet'):
+                wallet = rider_obj.commissioner.wallet
+                wallet.credit(commissioner_amount)
+                WalletTransaction.objects.create(
+                    wallet=wallet,
+                    amount=commissioner_amount,
+                    transaction_type='credit',
+                    description=f"Commission from BookRiderAssignment {instance.id} (BookRider {instance.book_rider.id})",
+                    reference=str(instance.id)
+                )
