@@ -143,3 +143,15 @@ def create_wallet_transactions_for_bookriderassignment(sender, instance, created
                     description=f"Commission from BookRiderAssignment {instance.id} (BookRider {instance.book_rider.id})",
                     reference=str(instance.id)
                 )
+
+        # Create transaction for boss wallet
+        try:
+            wallet = Wallet.objects.get(wallet_type='boss')
+            wallet.credit(boss_amount)
+            WalletTransaction.objects.create(
+                wallet=wallet,
+                amount=boss_amount,
+                transaction_type='credit',
+                description=f"Boss share from BookRiderAssignment {instance.id} (BookRider {instance.book_rider.id})",
+                reference=str(instance.id)
+            )
