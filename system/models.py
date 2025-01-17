@@ -2,6 +2,7 @@ import os
 from web.models import *
 from account.models import *
 from django.db import models
+from django.conf import settings
 from django.utils import timezone
 from django.utils.text import slugify
 from imagekit.processors import ResizeToFill
@@ -38,6 +39,23 @@ class Rider(models.Model):
         options={'quality': 90},
         null=True,
         blank=True
+    )
+    # NEW fields:
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='rider_profile',
+        help_text="Link to the rider's User account."
+    )
+    commissioner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='commissioner_riders',
+        help_text="Optional: The commission agent for this rider."
     )
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
