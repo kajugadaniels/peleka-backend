@@ -1,6 +1,7 @@
 import random
-from rest_framework import serializers
 from system.models import *
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
 
 class DeliveryRequestSerializer(serializers.ModelSerializer):
     client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the request')
@@ -172,70 +173,105 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
 class RiderSerializer(serializers.ModelSerializer):
     """
     Serializer for the Rider model.
-    Includes auto-generated, read-only code based on name initials and a unique 8-digit number.
-    Also includes delivery history with detailed information.
+    Automatically generates a unique code based on name initials and a unique 8-digit number.
+    Also automatically creates a corresponding User record using the provided name, email, and phone_number.
     """
+    # Include the images, making them optional.
     image = serializers.ImageField(required=False)
     permit_image = serializers.ImageField(required=False)
-    code = serializers.CharField(read_only=True)  # Code is read-only
-    delivery_history = RiderDeliverySerializer(source='rider_delivery', many=True, read_only=True, help_text='The delivery history of the rider')
+    code = serializers.CharField(read_only=True)  # Code is auto-generated and read-only.
+
+    # For output, include delivery history if needed.
+    delivery_history = RiderDeliverySerializer(
+        source='rider_delivery', many=True, read_only=True,
+        help_text='The delivery history of the rider'
+    )
+    
+    # Add a write-only email field (since the Rider model does not have an email field).
+    email = serializers.EmailField(write_only=True, required=True)
 
     class Meta:
         model = Rider
-        fields = ['id', 'name', 'phone_number', 'address', 'code', 'nid', 'image', 'permit_image', 'plate_number', 'insurance', 'delivery_history']
+        fields = [
+            'id', 'name', 'email', 'phone_number', 'address', 'code', 'nid',
+            'image', 'permit_image', 'plate_number', 'insurance', 'delivery_history'
+        ]
         read_only_fields = ['code', 'delivery_history']
 
     def generate_unique_code(self, name):
         """
-        Generates a unique code based on name initials and a random 8-digit number.
+        Generates a unique code based on the first two initials of the name and a random 8-digit number.
         Ensures uniqueness by checking against existing codes in the Rider model.
         """
-        # Extract initials (first letters of each name)
-        initials = ''.join([part[0].upper() for part in name.split() if part])[:2]  # Only the first 2 initials
-
-        # Generate a unique code by appending an 8-digit random number
+        # Extract the first two initials from the provided name
+        initials = ''.join([part[0].upper() for part in name.split() if part])[:2]
+        # Attempt generating a unique code in a loop
         while True:
             random_number = ''.join([str(random.randint(0, 9)) for _ in range(8)])
             code = f"{initials}{random_number}"
-
-            # Check if the generated code is unique
             if not Rider.objects.filter(code=code).exists():
                 return code
 
     def create(self, validated_data):
         """
-        Overrides create method to generate and set a unique code for each Rider.
+        Overrides the default create behavior:
+          - Extracts the required fields for the User model.
+          - Creates a corresponding User record with default password "Password!7".
+          - Associates the created user with the new Rider.
+          - Generates a unique code for the Rider.
         """
-        # Extract name from validated data to generate the code
+        # Extract required fields for creating the User record.
         name = validated_data.get('name', '')
+        phone_number = validated_data.get('phone_number', '')
+        email = validated_data.pop('email')  # Remove email from validated_data as Rider model doesn't use it.
+
+        # Generate the unique rider code.
         validated_data['code'] = self.generate_unique_code(name)
 
-        # Create and return the Rider instance
-        return super().create(validated_data)
+        # Create the corresponding user record.
+        User = get_user_model()
+        try:
+            user = User.objects.create_user(
+                name=name,
+                email=email,
+                phone_number=phone_number,
+                password="Password!7"
+            )
+        except Exception as e:
+            # You might want to log the error and raise a more specific exception.
+            raise serializers.ValidationError({"user_creation": "Could not create associated user account.", "detail": str(e)})
+
+        # Link the created user to the Rider.
+        validated_data['user'] = user
+
+        # Create and return the Rider instance.
+        rider = super().create(validated_data)
+        return rider
 
     def update(self, instance, validated_data):
-        # Handle image upload separately if provided
+        """
+        Update instance while handling image uploads if provided.
+        """
         if 'image' in validated_data:
             instance.image = validated_data.pop('image')
 
-        # Update the other fields
+        # Update the remaining fields.
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        
+
         instance.save()
         return instance
 
     def to_representation(self, instance):
         """
-        Override to_representation to include delivery_history only when retrieving a single Rider.
+        Optionally include delivery_history only for single retrieve operations.
         """
         representation = super().to_representation(instance)
         request = self.context.get('request')
-        if request and request.method == 'GET' and 'pk' in self.context.get('view').kwargs:
-            # Include delivery_history only for retrieve operations
+        view = self.context.get('view')
+        if request and view and 'pk' in view.kwargs:
             representation['delivery_history'] = RiderDeliverySerializer(instance.rider_delivery.all(), many=True).data
         else:
-            # Optionally, omit or include minimal delivery_history for list operations
             representation.pop('delivery_history', None)
         return representation
 
