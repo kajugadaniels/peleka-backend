@@ -89,3 +89,5 @@ def create_wallet_transactions_for_riderdelivery(sender, instance, created, **kw
                 description=f"Boss share from RiderDelivery {instance.id} (DeliveryRequest {instance.delivery_request.id})",
                 reference=str(instance.id)
             )
+        except Wallet.DoesNotExist:
+            pass
