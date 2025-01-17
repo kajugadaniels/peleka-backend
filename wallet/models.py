@@ -28,3 +28,6 @@ class Wallet(models.Model):
         """Debit the wallet by a given amount."""
         self.balance -= amount
         self.save()
+
+    def __str__(self):
+        return f"{self.user} - {self.wallet_type.capitalize()} Wallet"
