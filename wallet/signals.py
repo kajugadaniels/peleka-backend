@@ -76,3 +76,16 @@ def create_wallet_transactions_for_riderdelivery(sender, instance, created, **kw
                     description=f"Commission from RiderDelivery {instance.id} (DeliveryRequest {instance.delivery_request.id})",
                     reference=str(instance.id)
                 )
+
+        # Create transaction for boss wallet (assume there is exactly one boss user with a wallet)
+        # For simplicity, we retrieve the boss wallet by filtering on wallet_type
+        try:
+            wallet = Wallet.objects.get(wallet_type='boss')
+            wallet.credit(boss_amount)
+            WalletTransaction.objects.create(
+                wallet=wallet,
+                amount=boss_amount,
+                transaction_type='credit',
+                description=f"Boss share from RiderDelivery {instance.id} (DeliveryRequest {instance.delivery_request.id})",
+                reference=str(instance.id)
+            )
