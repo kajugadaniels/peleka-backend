@@ -17,3 +17,24 @@ class WalletAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
     )
+
+@admin.register(WalletTransaction)
+class WalletTransactionAdmin(admin.ModelAdmin):
+    list_display = ('wallet', 'transaction_type', 'amount', 'reference', 'created_at')
+    list_filter = ('transaction_type', 'created_at')
+    search_fields = ('wallet__user__email', 'wallet__user__username', 'reference', 'description')
+    readonly_fields = ('created_at',)
+    ordering = ('-created_at',)
+    fieldsets = (
+        (None, {
+            'fields': ('wallet', 'transaction_type', 'amount', 'reference')
+        }),
+        ('Description', {
+            'fields': ('description',),
+            'classes': ('wide',),
+        }),
+        ('Timestamp', {
+            'fields': ('created_at',),
+            'classes': ('collapse',),
+        }),
+    )
