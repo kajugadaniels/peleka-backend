@@ -1,6 +1,6 @@
+from decimal import Decimal
 from django.db import models
 from django.conf import settings
-from decimal import Decimal
 
 class Wallet(models.Model):
     WALLET_TYPES = (
@@ -29,5 +29,16 @@ class Wallet(models.Model):
             wallet=self, 
             amount=amount, 
             transaction_type='credit', 
+            description=description
+        )
+
+    def debit(self, amount, description=""):
+        """Decrease wallet balance and log a debit transaction."""
+        self.balance -= amount
+        self.save()
+        WalletTransaction.objects.create(
+            wallet=self, 
+            amount=amount, 
+            transaction_type='debit', 
             description=description
         )
