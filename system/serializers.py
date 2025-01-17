@@ -1,6 +1,8 @@
 import random
-from rest_framework import serializers
 from system.models import *
+from decimal import Decimal
+from wallets.models import *
+from rest_framework import serializers
 
 class DeliveryRequestSerializer(serializers.ModelSerializer):
     client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the request')
@@ -154,19 +156,39 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        """Handle the update logic to change the rider's delivery assignment."""
-        # Update delivered status
-        delivered = validated_data.get('delivered')
-        if delivered is not None:
-            instance.delivered = delivered
-            if delivered:
-                instance.delivered_at = timezone.now()
-                # Optionally, update the delivery_request status
-                if instance.delivery_request:
-                    instance.delivery_request.status = 'Completed'
-                    instance.delivery_request.save()
-
-        instance.save()
+        # Record if delivered was changed from False to True
+        delivered = validated_data.get('delivered', instance.delivered)
+        was_delivered = instance.delivered
+        instance = super().update(instance, validated_data)
+        if delivered and not was_delivered:
+            # Delivery has just been completed—credit the wallets.
+            if instance.delivery_request and instance.delivery_request.delivery_price:
+                price = Decimal(instance.delivery_request.delivery_price)
+            else:
+                price = Decimal('0.00')
+            # Split the amount:
+            rider_amount = price * Decimal('0.90')
+            # Check if the rider has a commissioner:
+            rider = instance.rider
+            if rider.commissioner:
+                commissioner_amount = price * Decimal('0.03')
+                boss_amount = price * Decimal('0.07')
+            else:
+                commissioner_amount = Decimal('0.00')
+                boss_amount = price * Decimal('0.10')
+            # Update the rider’s wallet (assume rider.user exists)
+            rider_wallet = Wallet.objects.filter(owner=rider.user, wallet_type='rider').first()
+            if rider_wallet:
+                rider_wallet.credit(rider_amount, description=f"Credit from delivery request {instance.delivery_request.id}")
+            # Update commission wallet if applicable
+            if commissioner_amount > 0:
+                commissioner_wallet = Wallet.objects.filter(owner=rider.commissioner, wallet_type='commissioner').first()
+                if commissioner_wallet:
+                    commissioner_wallet.credit(commissioner_amount, description=f"Credit from delivery request {instance.delivery_request.id} (Rider: {rider.name})")
+            # Update boss wallet (assume only one boss wallet exists)
+            boss_wallet = Wallet.objects.filter(wallet_type='boss').first()
+            if boss_wallet:
+                boss_wallet.credit(boss_amount, description=f"Credit from delivery request {instance.delivery_request.id}")
         return instance
 
 class RiderSerializer(serializers.ModelSerializer):
