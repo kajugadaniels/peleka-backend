@@ -1,8 +1,6 @@
 import random
-from system.models import *
-from decimal import Decimal
-from wallets.models import *
 from rest_framework import serializers
+from system.models import *
 
 class DeliveryRequestSerializer(serializers.ModelSerializer):
     client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the request')
@@ -156,39 +154,19 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        # Record if delivered was changed from False to True
-        delivered = validated_data.get('delivered', instance.delivered)
-        was_delivered = instance.delivered
-        instance = super().update(instance, validated_data)
-        if delivered and not was_delivered:
-            # Delivery has just been completed—credit the wallets.
-            if instance.delivery_request and instance.delivery_request.delivery_price:
-                price = Decimal(instance.delivery_request.delivery_price)
-            else:
-                price = Decimal('0.00')
-            # Split the amount:
-            rider_amount = price * Decimal('0.90')
-            # Check if the rider has a commissioner:
-            rider = instance.rider
-            if rider.commissioner:
-                commissioner_amount = price * Decimal('0.03')
-                boss_amount = price * Decimal('0.07')
-            else:
-                commissioner_amount = Decimal('0.00')
-                boss_amount = price * Decimal('0.10')
-            # Update the rider’s wallet (assume rider.user exists)
-            rider_wallet = Wallet.objects.filter(owner=rider.user, wallet_type='rider').first()
-            if rider_wallet:
-                rider_wallet.credit(rider_amount, description=f"Credit from delivery request {instance.delivery_request.id}")
-            # Update commission wallet if applicable
-            if commissioner_amount > 0:
-                commissioner_wallet = Wallet.objects.filter(owner=rider.commissioner, wallet_type='commissioner').first()
-                if commissioner_wallet:
-                    commissioner_wallet.credit(commissioner_amount, description=f"Credit from delivery request {instance.delivery_request.id} (Rider: {rider.name})")
-            # Update boss wallet (assume only one boss wallet exists)
-            boss_wallet = Wallet.objects.filter(wallet_type='boss').first()
-            if boss_wallet:
-                boss_wallet.credit(boss_amount, description=f"Credit from delivery request {instance.delivery_request.id}")
+        """Handle the update logic to change the rider's delivery assignment."""
+        # Update delivered status
+        delivered = validated_data.get('delivered')
+        if delivered is not None:
+            instance.delivered = delivered
+            if delivered:
+                instance.delivered_at = timezone.now()
+                # Optionally, update the delivery_request status
+                if instance.delivery_request:
+                    instance.delivery_request.status = 'Completed'
+                    instance.delivery_request.save()
+
+        instance.save()
         return instance
 
 class RiderSerializer(serializers.ModelSerializer):
@@ -197,8 +175,6 @@ class RiderSerializer(serializers.ModelSerializer):
     Includes auto-generated, read-only code based on name initials and a unique 8-digit number.
     Also includes delivery history with detailed information.
     """
-    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False)
-    commissioner = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False, allow_null=True)
     image = serializers.ImageField(required=False)
     permit_image = serializers.ImageField(required=False)
     code = serializers.CharField(read_only=True)  # Code is read-only
@@ -206,7 +182,7 @@ class RiderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Rider
-        fields = ['id', 'user', 'commissioner', 'name', 'phone_number', 'address', 'code', 'nid', 'image', 'permit_image', 'plate_number', 'insurance', 'delivery_history']
+        fields = ['id', 'name', 'phone_number', 'address', 'code', 'nid', 'image', 'permit_image', 'plate_number', 'insurance', 'delivery_history']
         read_only_fields = ['code', 'delivery_history']
 
     def generate_unique_code(self, name):
@@ -376,35 +352,37 @@ class BookRiderAssignmentSerializer(serializers.ModelSerializer):
         return assignment
 
     def update(self, instance, validated_data):
-        original_status = instance.status
-        instance = super().update(instance, validated_data)
-        if instance.status == 'Completed' and original_status != 'Completed':
-            # Retrieve booking price from the associated BookRider
-            if instance.book_rider and instance.book_rider.booking_price:
-                price = Decimal(instance.book_rider.booking_price)
-            else:
-                price = Decimal('0.00')
-            rider_amount = price * Decimal('0.90')
-            rider = instance.rider
-            if rider.commissioner:
-                commissioner_amount = price * Decimal('0.03')
-                boss_amount = price * Decimal('0.07')
-            else:
-                commissioner_amount = Decimal('0.00')
-                boss_amount = price * Decimal('0.10')
-            # Update rider wallet
-            rider_wallet = Wallet.objects.filter(owner=rider.user, wallet_type='rider').first()
-            if rider_wallet:
-                rider_wallet.credit(rider_amount, description=f"Credit from book rider assignment {instance.book_rider.id}")
-            # Update commissioner wallet if available
-            if commissioner_amount > 0:
-                commissioner_wallet = Wallet.objects.filter(owner=rider.commissioner, wallet_type='commissioner').first()
-                if commissioner_wallet:
-                    commissioner_wallet.credit(commissioner_amount, description=f"Credit from book rider assignment {instance.book_rider.id} (Rider: {rider.name})")
-            # Update boss wallet
-            boss_wallet = Wallet.objects.filter(wallet_type='boss').first()
-            if boss_wallet:
-                boss_wallet.credit(boss_amount, description=f"Credit from book rider assignment {instance.book_rider.id}")
+        """
+        Update an existing BookRiderAssignment instance.
+        Handles status transitions and timestamp updates.
+        """
+        status = validated_data.get('status', instance.status)
+        
+        # Allow only 'rider' to be updated
+        if 'rider' in validated_data:
+            new_rider = validated_data.pop('rider')
+            # Check if the new rider is available
+            if BookRiderAssignment.objects.filter(rider=new_rider, status__in=['Pending', 'Confirmed', 'In Progress']).exists():
+                raise serializers.ValidationError("The new rider is currently unavailable for assignment.")
+            instance.rider = new_rider
+            instance.assigned_at = timezone.now()
+        
+        if status != instance.status:
+            if status == 'In Progress':
+                instance.in_progress_at = timezone.now()
+            elif status == 'Completed':
+                instance.completed_at = timezone.now()
+                # Update the BookRider status
+                instance.book_rider.status = 'Completed'
+                instance.book_rider.save()
+            elif status == 'Cancelled':
+                instance.cancelled_at = timezone.now()
+                # Update the BookRider status
+                instance.book_rider.status = 'Cancelled'
+                instance.book_rider.save()
+        
+        instance.status = status
+        instance.save()
         return instance
 
 class BookRiderAssignmentCompleteSerializer(serializers.ModelSerializer):
