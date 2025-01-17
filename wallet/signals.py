@@ -63,3 +63,16 @@ def create_wallet_transactions_for_riderdelivery(sender, instance, created, **kw
                 description=f"Delivery Payment from DeliveryRequest {instance.delivery_request.id} via RiderDelivery {instance.id}",
                 reference=str(instance.id)
             )
+
+        # Create transaction for commissioner wallet, if exists
+        if rider_obj.commissioner:
+            if hasattr(rider_obj.commissioner, 'wallet'):
+                wallet = rider_obj.commissioner.wallet
+                wallet.credit(commissioner_amount)
+                WalletTransaction.objects.create(
+                    wallet=wallet,
+                    amount=commissioner_amount,
+                    transaction_type='credit',
+                    description=f"Commission from RiderDelivery {instance.id} (DeliveryRequest {instance.delivery_request.id})",
+                    reference=str(instance.id)
+                )
