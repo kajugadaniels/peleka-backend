@@ -23,3 +23,8 @@ class Wallet(models.Model):
         """Credit the wallet by a given amount."""
         self.balance += amount
         self.save()
+
+    def debit(self, amount):
+        """Debit the wallet by a given amount."""
+        self.balance -= amount
+        self.save()
