@@ -1,5 +1,8 @@
+import logging
+from decimal import Decimal
 from system.models import *
 from system.serializers import *
+from transactions.models import *
 from account.serializers import *
 from rest_framework.views import APIView
 from rest_framework import status
@@ -596,8 +599,10 @@ class RiderDeliveryListView(generics.ListAPIView):
 class AddRiderDeliveryView(generics.CreateAPIView):
     """
     API view to assign a rider to a delivery request.
+    
     - Accessible only to authenticated users with appropriate permissions.
-    - Automatically updates the delivery request status to "In Progress" upon assignment.
+    - Automatically updates the delivery request status to "Accepted" upon assignment.
+    - Dispatches the delivery revenue into wallet entries (Transaction) and records each event in TransactionHistory.
     """
     queryset = RiderDelivery.objects.all().order_by('-id')
     serializer_class = RiderDeliverySerializer
@@ -632,22 +637,81 @@ class AddRiderDeliveryView(generics.CreateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Assign the rider by creating a new RiderDelivery entry with delivered=False
+        # Create the RiderDelivery entry
         rider_delivery = RiderDelivery.objects.create(
             rider=rider,
             delivery_request=delivery_request,
             delivered=False,
             assigned_at=timezone.now(),
-            # in_progress_at=timezone.now(),
             last_assigned_at=timezone.now()
         )
 
-        # Update the delivery request status
+        # Update the delivery request status to 'Accepted'
         delivery_request.status = 'Accepted'
         delivery_request.save()
 
-        serializer = self.get_serializer(rider_delivery)
+        # Dispatch the delivery revenue into transactions
+        logger = logging.getLogger(__name__)
+        try:
+            # Retrieve and convert the delivery price; default to 0 if absent.
+            if delivery_request.delivery_price:
+                price = Decimal(str(delivery_request.delivery_price))
+            else:
+                price = Decimal('0.00')
 
+            # Calculate shares:
+            # If a commissioner exists:
+            #    rider: 90%, commissioner: 3%, boss: 7%
+            # Else:
+            #    rider: 90%, boss: 10%
+            rider_share = (price * Decimal('0.90')).quantize(Decimal('0.01'))
+            commissioner_obj = rider.commissioner  # may be None
+            boss_obj = rider.boss
+
+            if commissioner_obj:
+                commission_share = (price * Decimal('0.03')).quantize(Decimal('0.01'))
+                boss_share = (price * Decimal('0.07')).quantize(Decimal('0.01'))
+            else:
+                commission_share = Decimal('0.00')
+                boss_share = (price * Decimal('0.10')).quantize(Decimal('0.01'))
+
+            # Retrieve associated User objects from the Rider record.
+            rider_user = rider.user
+            commissioner_user = commissioner_obj.user if commissioner_obj else None
+            boss_user = boss_obj.user if boss_obj else None
+
+            # Get or create the Transaction record (wallet)
+            transaction_obj, created = Transaction.objects.get_or_create(
+                rider=rider_user,
+                commissioner=commissioner_user,
+                boss=boss_user,
+                defaults={
+                    'rider_total': Decimal('0.00'),
+                    'commissioner_total': Decimal('0.00'),
+                    'boss_total': Decimal('0.00'),
+                }
+            )
+            # Update wallet totals
+            transaction_obj.rider_total += rider_share
+            if commissioner_user:
+                transaction_obj.commissioner_total += commission_share
+                transaction_obj.boss_total += boss_share
+            else:
+                transaction_obj.boss_total += boss_share
+            transaction_obj.save()
+
+            # Create a history record for this transaction event
+            TransactionHistory.objects.create(
+                transaction=transaction_obj,
+                delivery_request=delivery_request,
+                rider_amount=rider_share,
+                commissioner_amount=commission_share,
+                boss_amount=boss_share
+            )
+        except Exception as e:
+            logger.error(f"Error dispatching transaction amounts: {e}")
+
+        serializer = self.get_serializer(rider_delivery)
         return Response(
             {
                 'message': "Rider assigned to delivery request successfully.",
