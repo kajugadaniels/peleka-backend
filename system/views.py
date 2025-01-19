@@ -4,8 +4,8 @@ from system.models import *
 from system.serializers import *
 from transactions.models import *
 from account.serializers import *
+from django.db import transaction
 from rest_framework.views import APIView
-from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
 from django.shortcuts import get_object_or_404
@@ -607,7 +607,7 @@ class AddRiderDeliveryView(generics.CreateAPIView):
       the Transaction and TransactionHistory models.
     """
     queryset = RiderDelivery.objects.all().order_by('-id')
-    serializer_class =  RiderDeliverySerializer
+    serializer_class = RiderDeliverySerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
@@ -655,7 +655,6 @@ class AddRiderDeliveryView(generics.CreateAPIView):
                 delivery_request.save()
 
                 # --- TRANSACTION DISPATCH LOGIC ---
-
                 # Convert delivery_price into a Decimal; default to 0 if not set
                 try:
                     if delivery_request.delivery_price:
@@ -670,8 +669,8 @@ class AddRiderDeliveryView(generics.CreateAPIView):
 
                 # Calculate shares based on whether a commissioner is assigned.
                 rider_share = (price * Decimal('0.90')).quantize(Decimal('0.01'))
-                commissioner_obj = rider.commissioner  # may be None
-                boss_obj = rider.boss
+                commissioner_obj = rider.commissioner  # already a User instance (or None)
+                boss_obj = rider.boss                # already a User instance (or None)
 
                 if commissioner_obj:
                     commission_share = (price * Decimal('0.03')).quantize(Decimal('0.01'))
@@ -682,10 +681,11 @@ class AddRiderDeliveryView(generics.CreateAPIView):
 
                 logger.debug(f"Calculated shares: rider_share={rider_share}, commission_share={commission_share}, boss_share={boss_share}")
 
-                # Retrieve associated User objects
+                # Retrieve associated User objects.
+                # rider.user is the associated user from the Rider model.
                 rider_user = rider.user
-                commissioner_user = commissioner_obj.user if commissioner_obj else None
-                boss_user = boss_obj.user if boss_obj else None
+                commissioner_user = commissioner_obj  if commissioner_obj else None  # Use directly
+                boss_user = boss_obj if boss_obj else None  # Use directly
 
                 # Get or create the Transaction record (wallet) for this combination
                 transaction_obj, created = Transaction.objects.get_or_create(
@@ -719,7 +719,6 @@ class AddRiderDeliveryView(generics.CreateAPIView):
                 logger.debug("TransactionHistory record created successfully.")
         except Exception as e:
             logger.error(f"Error dispatching transaction amounts: {e}", exc_info=True)
-            # Re-raise the exception so you get the error response and details.
             raise e
 
         # Serialize and return the created RiderDelivery
