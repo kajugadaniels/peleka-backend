@@ -76,78 +76,82 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
         return instance
 
 class RiderDeliverySerializer(serializers.ModelSerializer):
-    # Rider information fields
-    rider_id = serializers.ReadOnlyField(source='rider.id', help_text='The ID of the rider')
-    rider_name = serializers.ReadOnlyField(source='rider.name', help_text='The name of the rider')
-    rider_phone_number = serializers.ReadOnlyField(source='rider.phone_number', help_text='The phone number of the rider')
-    rider_address = serializers.ReadOnlyField(source='rider.address', help_text='The address of the rider')
-    rider_code = serializers.ReadOnlyField(source='rider.code', help_text='The unique code of the rider')
-    rider_nid = serializers.ReadOnlyField(source='rider.nid', help_text='The national ID of the rider')
-    rider_image = serializers.ImageField(source='rider.image', help_text='The image of the rider', read_only=True)
+    # Writable fields so that the incoming rider and delivery_request IDs are processed:
+    rider = serializers.PrimaryKeyRelatedField(queryset=Rider.objects.all(), write_only=True)
+    delivery_request = serializers.PrimaryKeyRelatedField(queryset=DeliveryRequest.objects.all(), write_only=True)
 
-    # Delivery request details
-    package_name = serializers.ReadOnlyField(source='delivery_request.package_name', help_text='Name of the package')
-    delivery_request_id = serializers.ReadOnlyField(source='delivery_request.id', help_text='The ID of the delivery request')
-    pickup_address = serializers.ReadOnlyField(source='delivery_request.pickup_address', help_text='The pickup address of the delivery request')
-    pickup_lat = serializers.ReadOnlyField(source='delivery_request.pickup_lat', help_text='The pickup address of the delivery request')
-    pickup_lng = serializers.ReadOnlyField(source='delivery_request.pickup_lng', help_text='The pickup address of the delivery request')
-    delivery_address = serializers.ReadOnlyField(source='delivery_request.delivery_address', help_text='The delivery address of the delivery request')
-    delivery_lat = serializers.ReadOnlyField(source='delivery_request.delivery_lat', help_text='The delivery address of the delivery request')
-    delivery_lng = serializers.ReadOnlyField(source='delivery_request.delivery_lng', help_text='The delivery address of the delivery request')
-    package_description = serializers.ReadOnlyField(source='delivery_request.package_description', help_text='Description of the package')
-    estimated_distance_km = serializers.ReadOnlyField(source='delivery_request.estimated_distance_km', help_text='The estimated distance in kilometers')
-    estimated_delivery_time = serializers.ReadOnlyField(source='delivery_request.estimated_delivery_time', help_text='The estimated delivery time')
-    value_of_product = serializers.ReadOnlyField(source='delivery_request.value_of_product', help_text='The value of the product being delivered')
-    delivery_price = serializers.ReadOnlyField(source='delivery_request.delivery_price', help_text='The delivery price calculated')
-    status = serializers.ReadOnlyField(source='delivery_request.status', help_text='The status of the delivery request')
+    # Read-only representation fields
+    rider_id = serializers.IntegerField(source='rider.id', read_only=True)
+    rider_name = serializers.CharField(source='rider.name', read_only=True)
+    rider_phone_number = serializers.CharField(source='rider.phone_number', read_only=True)
+    rider_address = serializers.CharField(source='rider.address', read_only=True)
+    rider_code = serializers.CharField(source='rider.code', read_only=True)
+    rider_nid = serializers.CharField(source='rider.nid', read_only=True)
+    rider_image = serializers.ImageField(source='rider.image', read_only=True)
 
-    # Client information
-    client_name = serializers.ReadOnlyField(source='delivery_request.client.name', help_text='The name of the client')
-    client_phone_number = serializers.ReadOnlyField(source='delivery_request.client.phone_number', help_text='The phone number of the client')
+    delivery_request_id = serializers.IntegerField(source='delivery_request.id', read_only=True)
+    package_name = serializers.CharField(source='delivery_request.package_name', read_only=True)
+    pickup_address = serializers.CharField(source='delivery_request.pickup_address', read_only=True)
+    pickup_lat = serializers.CharField(source='delivery_request.pickup_lat', read_only=True)
+    pickup_lng = serializers.CharField(source='delivery_request.pickup_lng', read_only=True)
+    delivery_address = serializers.CharField(source='delivery_request.delivery_address', read_only=True)
+    delivery_lat = serializers.CharField(source='delivery_request.delivery_lat', read_only=True)
+    delivery_lng = serializers.CharField(source='delivery_request.delivery_lng', read_only=True)
+    package_description = serializers.CharField(source='delivery_request.package_description', read_only=True)
+    estimated_distance_km = serializers.CharField(source='delivery_request.estimated_distance_km', read_only=True)
+    estimated_delivery_time = serializers.CharField(source='delivery_request.estimated_delivery_time', read_only=True)
+    value_of_product = serializers.CharField(source='delivery_request.value_of_product', read_only=True)
+    delivery_price = serializers.CharField(source='delivery_request.delivery_price', read_only=True)
+    status = serializers.CharField(source='delivery_request.status', read_only=True)
 
-    # Recipient information
-    recipient_name = serializers.ReadOnlyField(source='delivery_request.recipient_name', help_text='The name of the client')
-    recipient_phone = serializers.ReadOnlyField(source='delivery_request.recipient_phone', help_text='The phone number of the client')
-
-    created_at = serializers.ReadOnlyField(source='delivery_request.created_at', help_text='The creation date of the delivery request')
-    updated_at = serializers.ReadOnlyField(source='delivery_request.updated_at', help_text='The last update date of the delivery request')
+    client_name = serializers.CharField(source='delivery_request.client.name', read_only=True)
+    client_phone_number = serializers.CharField(source='delivery_request.client.phone_number', read_only=True)
+    recipient_name = serializers.CharField(source='delivery_request.recipient_name', read_only=True)
+    recipient_phone = serializers.CharField(source='delivery_request.recipient_phone', read_only=True)
+    created_at = serializers.DateTimeField(source='delivery_request.created_at', read_only=True)
+    updated_at = serializers.DateTimeField(source='delivery_request.updated_at', read_only=True)
 
     class Meta:
         model = RiderDelivery
+        # IMPORTANT: Do not include rider and delivery_request in read_only_fields,
+        # so that they can be written via the PrimaryKeyRelatedFields defined above.
         fields = [
-            'id', 'rider_id', 'rider_name', 'rider_phone_number', 'rider_address', 'rider_code',
-            'rider_nid', 'rider_image', 'delivered', 'last_assigned_at', 'package_name',
-            'delivery_request_id', 'pickup_address', 'pickup_lat', 'pickup_lng', 'delivery_address', 'delivery_lat', 'delivery_lng',
-            'package_description', 'estimated_distance_km', 'estimated_delivery_time',
-            'value_of_product', 'delivery_price', 'status', 'client_name',
-            'client_phone_number', 'recipient_name', 'recipient_phone', 'assigned_at', 'in_progress_at', 'delivered_at',
+            'id', 'rider', 'delivery_request',
+            'rider_id', 'rider_name', 'rider_phone_number', 'rider_address', 'rider_code',
+            'rider_nid', 'rider_image',
+            'delivered', 'last_assigned_at', 
+            'package_name', 'delivery_request_id', 'pickup_address', 'pickup_lat', 'pickup_lng',
+            'delivery_address', 'delivery_lat', 'delivery_lng', 'package_description',
+            'estimated_distance_km', 'estimated_delivery_time', 'value_of_product',
+            'delivery_price', 'status', 'client_name', 'client_phone_number',
+            'recipient_name', 'recipient_phone', 'assigned_at', 'in_progress_at', 'delivered_at',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'rider_id', 'rider_name', 'rider_phone_number', 'rider_address',
-            'rider_code', 'rider_nid', 'rider_image', 'last_assigned_at', 'package_name',
-            'delivery_request_id', 'pickup_address', 'pickup_lat', 'pickup_lng', 'delivery_address', 'delivery_lat', 'delivery_lng',
-            'package_description', 'estimated_distance_km', 'estimated_delivery_time',
-            'value_of_product', 'delivery_price', 'status', 'client_name',
-            'client_phone_number', 'recipient_name', 'recipient_phone', 'assigned_at', 'in_progress_at',
-            'delivered_at', 'created_at', 'updated_at'
+            'rider_code', 'rider_nid', 'rider_image', 'last_assigned_at', 
+            'package_name', 'delivery_request_id', 'pickup_address', 'pickup_lat', 'pickup_lng',
+            'delivery_address', 'delivery_lat', 'delivery_lng', 'package_description',
+            'estimated_distance_km', 'estimated_delivery_time', 'value_of_product',
+            'delivery_price', 'status', 'client_name', 'client_phone_number',
+            'recipient_name', 'recipient_phone', 'assigned_at', 'in_progress_at', 'delivered_at',
+            'created_at', 'updated_at'
         ]
 
     def validate(self, data):
         """Ensure that a rider can be assigned only if they are available."""
-        rider = self.initial_data.get('rider')
-        if rider and RiderDelivery.objects.filter(rider=rider).exclude(delivered=True).exists():
+        rider_obj = data.get('rider')
+        if rider_obj and RiderDelivery.objects.filter(rider=rider_obj).exclude(delivered=True).exists():
             raise serializers.ValidationError("Rider is currently unavailable for a new delivery assignment.")
         return data
 
     def create(self, validated_data):
         """
-        Create a new RiderDelivery instance with assigned_at and in_progress_at set to the current time.
-        Also dispatch the delivery_price from the associated DeliveryRequest into transaction shares:
+        Create a new RiderDelivery instance and dispatch transaction amounts:
           - Rider: 90%
           - Commissioner: 3% (if present)
           - Boss: 7% (if commissioner exists) or 10% (if no commissioner)
-        Then update (or create) the corresponding Transaction record and create a TransactionHistory record.
+        Then update (or create) the corresponding Transaction record and add a TransactionHistory record.
         """
         validated_data['delivered'] = False
         now = timezone.now()
@@ -173,9 +177,9 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
             # Calculate each party's share
             rider_share = (delivery_price * Decimal('0.90')).quantize(Decimal('0.01'))
             rider_instance = rider_delivery.rider
-            # Get commissioner and boss from the Rider model instance
-            commissioner_obj = rider_instance.commissioner  # May be None
+            commissioner_obj = rider_instance.commissioner  # may be None
             boss_obj = rider_instance.boss
+
             if commissioner_obj:
                 commission_share = (delivery_price * Decimal('0.03')).quantize(Decimal('0.01'))
                 boss_share = (delivery_price * Decimal('0.07')).quantize(Decimal('0.01'))
@@ -183,12 +187,12 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
                 commission_share = Decimal('0.00')
                 boss_share = (delivery_price * Decimal('0.10')).quantize(Decimal('0.01'))
 
-            # Use the related User objects from the Rider model (the field 'user' on Rider)
+            # Use the related User objects from the Rider model (assume the Rider model has a 'user' field)
             rider_user = rider_instance.user
             commissioner_user = commissioner_obj.user if commissioner_obj else None
             boss_user = boss_obj.user if boss_obj else None
 
-            # Get or create the wallet (Transaction) record for this set of users
+            # Get or create the Transaction record (wallet) for these parties
             transaction_obj, created = Transaction.objects.get_or_create(
                 rider=rider_user,
                 commissioner=commissioner_user,
@@ -199,17 +203,16 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
                     'boss_total': Decimal('0.00')
                 }
             )
-            # Update wallet totals
+            # Update totals
             transaction_obj.rider_total += rider_share
             if commissioner_user:
                 transaction_obj.commissioner_total += commission_share
                 transaction_obj.boss_total += boss_share
             else:
-                # If there is no commissioner, add the entire boss share (10% overall)
                 transaction_obj.boss_total += boss_share
             transaction_obj.save()
 
-            # Create a history record for this transaction event
+            # Create a TransactionHistory record
             TransactionHistory.objects.create(
                 transaction=transaction_obj,
                 delivery_request=delivery_request,
@@ -225,18 +228,15 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         return rider_delivery
 
     def update(self, instance, validated_data):
-        """Handle the update logic to change the rider's delivery assignment."""
-        # Update delivered status
+        """Handle update logic (not affecting transactions in this example)."""
         delivered = validated_data.get('delivered')
         if delivered is not None:
             instance.delivered = delivered
             if delivered:
                 instance.delivered_at = timezone.now()
-                # Optionally, update the delivery_request status
                 if instance.delivery_request:
                     instance.delivery_request.status = 'Completed'
                     instance.delivery_request.save()
-
         instance.save()
         return instance
 
