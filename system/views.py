@@ -13,6 +13,8 @@ from django.core.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, permissions, status
 
+logger = logging.getLogger(__name__)
+
 class RoleListCreateView(generics.ListCreateAPIView):
     """
     API view to list all roles or create a new role. Ensures only users with appropriate permissions or superusers can access.
@@ -599,13 +601,13 @@ class RiderDeliveryListView(generics.ListAPIView):
 class AddRiderDeliveryView(generics.CreateAPIView):
     """
     API view to assign a rider to a delivery request.
-    
     - Accessible only to authenticated users with appropriate permissions.
-    - Automatically updates the delivery request status to "Accepted" upon assignment.
-    - Dispatches the delivery revenue into wallet entries (Transaction) and records each event in TransactionHistory.
+    - Automatically updates the delivery request status to "Accepted"
+      upon assignment and dispatches the delivery_price split (rider, commissioner, boss)
+      into the Transaction and TransactionHistory models.
     """
     queryset = RiderDelivery.objects.all().order_by('-id')
-    serializer_class = RiderDeliverySerializer
+    serializer_class =  RiderDeliverySerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
@@ -624,7 +626,6 @@ class AddRiderDeliveryView(generics.CreateAPIView):
             rider = Rider.objects.get(id=rider_id)
         except Rider.DoesNotExist:
             raise NotFound({'message': "Rider not found."})
-
         try:
             delivery_request = DeliveryRequest.objects.get(id=delivery_request_id)
         except DeliveryRequest.DoesNotExist:
@@ -637,7 +638,7 @@ class AddRiderDeliveryView(generics.CreateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Create the RiderDelivery entry
+        # Create the RiderDelivery entry after all validations
         rider_delivery = RiderDelivery.objects.create(
             rider=rider,
             delivery_request=delivery_request,
@@ -646,28 +647,28 @@ class AddRiderDeliveryView(generics.CreateAPIView):
             last_assigned_at=timezone.now()
         )
 
-        # Update the delivery request status to 'Accepted'
+        # Update the delivery request status to "Accepted"
         delivery_request.status = 'Accepted'
         delivery_request.save()
 
-        # Dispatch the delivery revenue into transactions
-        logger = logging.getLogger(__name__)
+        # Dispatch transaction amounts
         try:
-            # Retrieve and convert the delivery price; default to 0 if absent.
+            # Get the delivery price (if empty or invalid, default to zero)
             if delivery_request.delivery_price:
-                price = Decimal(str(delivery_request.delivery_price))
+                try:
+                    price = Decimal(str(delivery_request.delivery_price))
+                except Exception as conv_err:
+                    logger.error(f"Error converting delivery_price: {conv_err}")
+                    price = Decimal('0.00')
             else:
                 price = Decimal('0.00')
 
             # Calculate shares:
-            # If a commissioner exists:
-            #    rider: 90%, commissioner: 3%, boss: 7%
-            # Else:
-            #    rider: 90%, boss: 10%
+            # If a commissioner is assigned: rider = 90%, commissioner = 3%, boss = 7%
+            # Otherwise: rider = 90%, boss = 10% (commission = 0)
             rider_share = (price * Decimal('0.90')).quantize(Decimal('0.01'))
-            commissioner_obj = rider.commissioner  # may be None
+            commissioner_obj = rider.commissioner  # can be None
             boss_obj = rider.boss
-
             if commissioner_obj:
                 commission_share = (price * Decimal('0.03')).quantize(Decimal('0.01'))
                 boss_share = (price * Decimal('0.07')).quantize(Decimal('0.01'))
@@ -675,12 +676,12 @@ class AddRiderDeliveryView(generics.CreateAPIView):
                 commission_share = Decimal('0.00')
                 boss_share = (price * Decimal('0.10')).quantize(Decimal('0.01'))
 
-            # Retrieve associated User objects from the Rider record.
+            # Retrieve associated user objects from the Rider model
             rider_user = rider.user
             commissioner_user = commissioner_obj.user if commissioner_obj else None
             boss_user = boss_obj.user if boss_obj else None
 
-            # Get or create the Transaction record (wallet)
+            # Get or create the wallet (Transaction) record for this combination
             transaction_obj, created = Transaction.objects.get_or_create(
                 rider=rider_user,
                 commissioner=commissioner_user,
@@ -688,7 +689,7 @@ class AddRiderDeliveryView(generics.CreateAPIView):
                 defaults={
                     'rider_total': Decimal('0.00'),
                     'commissioner_total': Decimal('0.00'),
-                    'boss_total': Decimal('0.00'),
+                    'boss_total': Decimal('0.00')
                 }
             )
             # Update wallet totals
@@ -700,7 +701,7 @@ class AddRiderDeliveryView(generics.CreateAPIView):
                 transaction_obj.boss_total += boss_share
             transaction_obj.save()
 
-            # Create a history record for this transaction event
+            # Create a history record
             TransactionHistory.objects.create(
                 transaction=transaction_obj,
                 delivery_request=delivery_request,
@@ -711,6 +712,7 @@ class AddRiderDeliveryView(generics.CreateAPIView):
         except Exception as e:
             logger.error(f"Error dispatching transaction amounts: {e}")
 
+        # Serialize and return the created RiderDelivery
         serializer = self.get_serializer(rider_delivery)
         return Response(
             {
