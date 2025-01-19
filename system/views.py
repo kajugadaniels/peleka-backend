@@ -1,14 +1,19 @@
+import logging
+from decimal import Decimal
 from system.models import *
 from system.serializers import *
+from transactions.models import *
 from account.serializers import *
+from django.db import transaction
 from rest_framework.views import APIView
-from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, permissions, status
+
+logger = logging.getLogger(__name__)
 
 class RoleListCreateView(generics.ListCreateAPIView):
     """
@@ -597,7 +602,9 @@ class AddRiderDeliveryView(generics.CreateAPIView):
     """
     API view to assign a rider to a delivery request.
     - Accessible only to authenticated users with appropriate permissions.
-    - Automatically updates the delivery request status to "In Progress" upon assignment.
+    - Updates the delivery request status to "Accepted" upon assignment.
+    - Dispatches the delivery_price split (rider, commissioner, boss) into
+      the Transaction and TransactionHistory models.
     """
     queryset = RiderDelivery.objects.all().order_by('-id')
     serializer_class = RiderDeliverySerializer
@@ -619,35 +626,103 @@ class AddRiderDeliveryView(generics.CreateAPIView):
             rider = Rider.objects.get(id=rider_id)
         except Rider.DoesNotExist:
             raise NotFound({'message': "Rider not found."})
-
         try:
             delivery_request = DeliveryRequest.objects.get(id=delivery_request_id)
         except DeliveryRequest.DoesNotExist:
             raise NotFound({'message': "Delivery request not found."})
 
-        # Check if the rider is available (no RiderDelivery with delivered=False)
+        # Check if the rider is available (no active, undelivered RiderDelivery)
         if RiderDelivery.objects.filter(rider=rider, delivered=False).exists():
             return Response(
                 {'message': "This rider is not available at the moment."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Assign the rider by creating a new RiderDelivery entry with delivered=False
-        rider_delivery = RiderDelivery.objects.create(
-            rider=rider,
-            delivery_request=delivery_request,
-            delivered=False,
-            assigned_at=timezone.now(),
-            # in_progress_at=timezone.now(),
-            last_assigned_at=timezone.now()
-        )
+        # Wrap the entire operation in an atomic transaction.
+        try:
+            with transaction.atomic():
+                # Create the RiderDelivery entry
+                rider_delivery = RiderDelivery.objects.create(
+                    rider=rider,
+                    delivery_request=delivery_request,
+                    delivered=False,
+                    assigned_at=timezone.now(),
+                    last_assigned_at=timezone.now()
+                )
 
-        # Update the delivery request status
-        delivery_request.status = 'Accepted'
-        delivery_request.save()
+                # Update the delivery request's status to "Accepted"
+                delivery_request.status = 'Accepted'
+                delivery_request.save()
 
+                # --- TRANSACTION DISPATCH LOGIC ---
+                # Convert delivery_price into a Decimal; default to 0 if not set
+                try:
+                    if delivery_request.delivery_price:
+                        price = Decimal(str(delivery_request.delivery_price))
+                    else:
+                        price = Decimal('0.00')
+                except (InvalidOperation, TypeError) as conv_err:
+                    logger.error(f"Error converting delivery_price '{delivery_request.delivery_price}' to Decimal: {conv_err}")
+                    price = Decimal('0.00')
+
+                logger.debug(f"Delivery price converted to Decimal: {price}")
+
+                # Calculate shares based on whether a commissioner is assigned.
+                rider_share = (price * Decimal('0.90')).quantize(Decimal('0.01'))
+                commissioner_obj = rider.commissioner  # already a User instance (or None)
+                boss_obj = rider.boss                # already a User instance (or None)
+
+                if commissioner_obj:
+                    commission_share = (price * Decimal('0.03')).quantize(Decimal('0.01'))
+                    boss_share = (price * Decimal('0.07')).quantize(Decimal('0.01'))
+                else:
+                    commission_share = Decimal('0.00')
+                    boss_share = (price * Decimal('0.10')).quantize(Decimal('0.01'))
+
+                logger.debug(f"Calculated shares: rider_share={rider_share}, commission_share={commission_share}, boss_share={boss_share}")
+
+                # Retrieve associated User objects.
+                # rider.user is the associated user from the Rider model.
+                rider_user = rider.user
+                commissioner_user = commissioner_obj  if commissioner_obj else None  # Use directly
+                boss_user = boss_obj if boss_obj else None  # Use directly
+
+                # Get or create the Transaction record (wallet) for this combination
+                transaction_obj, created = Transaction.objects.get_or_create(
+                    rider=rider_user,
+                    commissioner=commissioner_user,
+                    boss=boss_user,
+                    defaults={
+                        'rider_total': Decimal('0.00'),
+                        'commissioner_total': Decimal('0.00'),
+                        'boss_total': Decimal('0.00')
+                    }
+                )
+                # Update wallet totals
+                transaction_obj.rider_total += rider_share
+                if commissioner_user:
+                    transaction_obj.commissioner_total += commission_share
+                    transaction_obj.boss_total += boss_share
+                else:
+                    transaction_obj.boss_total += boss_share
+                transaction_obj.save()
+                logger.debug(f"Transaction record updated: {transaction_obj}")
+
+                # Create a TransactionHistory record for this event
+                TransactionHistory.objects.create(
+                    transaction=transaction_obj,
+                    delivery_request=delivery_request,
+                    rider_amount=rider_share,
+                    commissioner_amount=commission_share,
+                    boss_amount=boss_share
+                )
+                logger.debug("TransactionHistory record created successfully.")
+        except Exception as e:
+            logger.error(f"Error dispatching transaction amounts: {e}", exc_info=True)
+            raise e
+
+        # Serialize and return the created RiderDelivery
         serializer = self.get_serializer(rider_delivery)
-
         return Response(
             {
                 'message': "Rider assigned to delivery request successfully.",

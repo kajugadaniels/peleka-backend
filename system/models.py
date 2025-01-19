@@ -2,6 +2,7 @@ import os
 from web.models import *
 from account.models import *
 from django.db import models
+from django.conf import settings
 from django.utils import timezone
 from django.utils.text import slugify
 from imagekit.processors import ResizeToFill
@@ -17,6 +18,7 @@ def rider_permit_image_path(instance, filename):
 
 class Rider(models.Model):
     name = models.CharField(max_length=100, null=True, blank=True)
+    email = models.CharField(max_length=100, unique=True, null=True, blank=True)
     phone_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
     address = models.CharField(max_length=255, null=True, blank=True)
     code = models.CharField(max_length=20, unique=True, null=True, blank=True)
@@ -38,6 +40,31 @@ class Rider(models.Model):
         options={'quality': 90},
         null=True,
         blank=True
+    )
+    # NEW fields:
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='rider_profile',
+        help_text="Link to the rider's User account."
+    )
+    commissioner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='commissioner_riders',
+        help_text="Optional: The commission agent for this rider."
+    )
+    boss = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='boss_riders',
+        help_text="Optional: The boss agent for this rider."
     )
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -158,6 +185,9 @@ class BookRiderAssignment(models.Model):
     completed_at = models.DateTimeField(blank=True, null=True, help_text='Timestamp when the booking was completed')
     cancelled_at = models.DateTimeField(blank=True, null=True, help_text='Timestamp when the booking was cancelled')
     status = models.CharField(max_length=20, choices=BookRider.STATUS_CHOICES, default='Pending', help_text='Current status of the assignment')
+
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-assigned_at']

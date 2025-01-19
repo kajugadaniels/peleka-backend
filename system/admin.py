@@ -43,7 +43,7 @@ class RiderAdmin(admin.ModelAdmin):
 
 
 @admin.register(RiderDelivery)
-class RiderDeliveryAdmin(ReadOnlyAdmin):
+class RiderDeliveryAdmin(admin.ModelAdmin):
     list_display = (
         'id', 'rider', 'delivery_request', 'delivered',
         'assigned_at', 'in_progress_at', 'delivered_at'

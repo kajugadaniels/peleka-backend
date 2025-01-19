@@ -1,6 +1,7 @@
 import random
-from rest_framework import serializers
 from system.models import *
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
 
 class DeliveryRequestSerializer(serializers.ModelSerializer):
     client_name = serializers.ReadOnlyField(source='client.name', help_text='The name of the client who made the request')
@@ -75,6 +76,16 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
         return instance
 
 class RiderDeliverySerializer(serializers.ModelSerializer):
+    """
+    Serializer for the RiderDelivery model.
+    
+    This serializer retrieves comprehensive details about the rider, delivery request,
+    and associated client/recipient details. Additionally, it now includes
+    the IDs of the rider's linked User account, the commissioner, and the boss.
+
+    It also performs validations to ensure that a rider is available for assignment
+    and updates timestamps and statuses during creation and update operations.
+    """
     # Rider information fields
     rider_id = serializers.ReadOnlyField(source='rider.id', help_text='The ID of the rider')
     rider_name = serializers.ReadOnlyField(source='rider.name', help_text='The name of the rider')
@@ -83,21 +94,26 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
     rider_code = serializers.ReadOnlyField(source='rider.code', help_text='The unique code of the rider')
     rider_nid = serializers.ReadOnlyField(source='rider.nid', help_text='The national ID of the rider')
     rider_image = serializers.ImageField(source='rider.image', help_text='The image of the rider', read_only=True)
+    
+    # New fields to retrieve associated User, Commissioner, and Boss IDs
+    rider_user_id = serializers.ReadOnlyField(source='rider.user.id', help_text="The ID of the rider's associated User account")
+    commissioner_id = serializers.ReadOnlyField(source='rider.commissioner.id', help_text="The ID of the rider's assigned commissioner")
+    boss_id = serializers.ReadOnlyField(source='rider.boss.id', help_text="The ID of the rider's assigned boss")
 
     # Delivery request details
     package_name = serializers.ReadOnlyField(source='delivery_request.package_name', help_text='Name of the package')
     delivery_request_id = serializers.ReadOnlyField(source='delivery_request.id', help_text='The ID of the delivery request')
     pickup_address = serializers.ReadOnlyField(source='delivery_request.pickup_address', help_text='The pickup address of the delivery request')
-    pickup_lat = serializers.ReadOnlyField(source='delivery_request.pickup_lat', help_text='The pickup address of the delivery request')
-    pickup_lng = serializers.ReadOnlyField(source='delivery_request.pickup_lng', help_text='The pickup address of the delivery request')
+    pickup_lat = serializers.ReadOnlyField(source='delivery_request.pickup_lat', help_text='Latitude of the pickup location')
+    pickup_lng = serializers.ReadOnlyField(source='delivery_request.pickup_lng', help_text='Longitude of the pickup location')
     delivery_address = serializers.ReadOnlyField(source='delivery_request.delivery_address', help_text='The delivery address of the delivery request')
-    delivery_lat = serializers.ReadOnlyField(source='delivery_request.delivery_lat', help_text='The delivery address of the delivery request')
-    delivery_lng = serializers.ReadOnlyField(source='delivery_request.delivery_lng', help_text='The delivery address of the delivery request')
+    delivery_lat = serializers.ReadOnlyField(source='delivery_request.delivery_lat', help_text='Latitude of the delivery location')
+    delivery_lng = serializers.ReadOnlyField(source='delivery_request.delivery_lng', help_text='Longitude of the delivery location')
     package_description = serializers.ReadOnlyField(source='delivery_request.package_description', help_text='Description of the package')
     estimated_distance_km = serializers.ReadOnlyField(source='delivery_request.estimated_distance_km', help_text='The estimated distance in kilometers')
     estimated_delivery_time = serializers.ReadOnlyField(source='delivery_request.estimated_delivery_time', help_text='The estimated delivery time')
     value_of_product = serializers.ReadOnlyField(source='delivery_request.value_of_product', help_text='The value of the product being delivered')
-    delivery_price = serializers.ReadOnlyField(source='delivery_request.delivery_price', help_text='The delivery price calculated')
+    delivery_price = serializers.ReadOnlyField(source='delivery_request.delivery_price', help_text='The calculated delivery price')
     status = serializers.ReadOnlyField(source='delivery_request.status', help_text='The status of the delivery request')
 
     # Client information
@@ -105,17 +121,19 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
     client_phone_number = serializers.ReadOnlyField(source='delivery_request.client.phone_number', help_text='The phone number of the client')
 
     # Recipient information
-    recipient_name = serializers.ReadOnlyField(source='delivery_request.recipient_name', help_text='The name of the client')
-    recipient_phone = serializers.ReadOnlyField(source='delivery_request.recipient_phone', help_text='The phone number of the client')
+    recipient_name = serializers.ReadOnlyField(source='delivery_request.recipient_name', help_text='The name of the recipient')
+    recipient_phone = serializers.ReadOnlyField(source='delivery_request.recipient_phone', help_text='The phone number of the recipient')
 
-    created_at = serializers.ReadOnlyField(source='delivery_request.created_at', help_text='The creation date of the delivery request')
-    updated_at = serializers.ReadOnlyField(source='delivery_request.updated_at', help_text='The last update date of the delivery request')
+    # Timestamps
+    created_at = serializers.ReadOnlyField(source='delivery_request.created_at', help_text='Creation date of the delivery request')
+    updated_at = serializers.ReadOnlyField(source='delivery_request.updated_at', help_text='Last update date of the delivery request')
 
     class Meta:
         model = RiderDelivery
         fields = [
             'id', 'rider_id', 'rider_name', 'rider_phone_number', 'rider_address', 'rider_code',
-            'rider_nid', 'rider_image', 'delivered', 'last_assigned_at', 'package_name',
+            'rider_nid', 'rider_image', 'rider_user_id', 'commissioner_id', 'boss_id',
+            'delivered', 'last_assigned_at', 'package_name',
             'delivery_request_id', 'pickup_address', 'pickup_lat', 'pickup_lng', 'delivery_address', 'delivery_lat', 'delivery_lng',
             'package_description', 'estimated_distance_km', 'estimated_delivery_time',
             'value_of_product', 'delivery_price', 'status', 'client_name',
@@ -124,7 +142,8 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'rider_id', 'rider_name', 'rider_phone_number', 'rider_address',
-            'rider_code', 'rider_nid', 'rider_image', 'last_assigned_at', 'package_name',
+            'rider_code', 'rider_nid', 'rider_image', 'rider_user_id', 'commissioner_id', 'boss_id',
+            'last_assigned_at', 'package_name',
             'delivery_request_id', 'pickup_address', 'pickup_lat', 'pickup_lng', 'delivery_address', 'delivery_lat', 'delivery_lng',
             'package_description', 'estimated_distance_km', 'estimated_delivery_time',
             'value_of_product', 'delivery_price', 'status', 'client_name',
@@ -133,19 +152,27 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
-        """Ensure that a rider can be assigned only if they are available."""
+        """
+        Ensure that the selected rider is available for a new delivery assignment.
+        
+        A rider is considered unavailable if there is already an in-progress (undelivered)
+        delivery assignment for them.
+        """
         rider = self.initial_data.get('rider')
         if rider and RiderDelivery.objects.filter(rider=rider).exclude(delivered=True).exists():
             raise serializers.ValidationError("Rider is currently unavailable for a new delivery assignment.")
         return data
 
     def create(self, validated_data):
-        """Create a new RiderDelivery instance with assigned_at and in_progress_at set to current time."""
+        """
+        Create a new RiderDelivery instance.
+        
+        Sets default values for 'delivered' and 'assigned_at'. Additionally, it updates
+        the associated delivery request's status to 'Accepted'.
+        """
         validated_data['delivered'] = False
         validated_data['assigned_at'] = timezone.now()
-        # validated_data['in_progress_at'] = timezone.now()
 
-        # Update the delivery request status
         delivery_request = validated_data.get('delivery_request')
         if delivery_request:
             delivery_request.status = 'Accepted'
@@ -154,14 +181,18 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        """Handle the update logic to change the rider's delivery assignment."""
-        # Update delivered status
+        """
+        Update a RiderDelivery instance.
+        
+        Handles updating the delivered status. When a delivery is marked as delivered,
+        the delivered_at timestamp is set, and the associated delivery request's status
+        is updated to 'Completed'.
+        """
         delivered = validated_data.get('delivered')
         if delivered is not None:
             instance.delivered = delivered
             if delivered:
                 instance.delivered_at = timezone.now()
-                # Optionally, update the delivery_request status
                 if instance.delivery_request:
                     instance.delivery_request.status = 'Completed'
                     instance.delivery_request.save()
@@ -169,73 +200,124 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+class UserSimpleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = get_user_model()  # This is your custom User model.
+        fields = ['id', 'name', 'email', 'phone_number']
+
 class RiderSerializer(serializers.ModelSerializer):
     """
     Serializer for the Rider model.
-    Includes auto-generated, read-only code based on name initials and a unique 8-digit number.
-    Also includes delivery history with detailed information.
+    Automatically generates a unique code based on name initials and a unique 8-digit number.
+    Also automatically creates a corresponding User record using the provided name, email, and phone_number.
     """
+    # Include the images, making them optional.
     image = serializers.ImageField(required=False)
     permit_image = serializers.ImageField(required=False)
-    code = serializers.CharField(read_only=True)  # Code is read-only
-    delivery_history = RiderDeliverySerializer(source='rider_delivery', many=True, read_only=True, help_text='The delivery history of the rider')
+    code = serializers.CharField(read_only=True)  # Code is auto-generated and read-only.
+
+    # For output, include delivery history if needed.
+    delivery_history = RiderDeliverySerializer(
+        source='rider_delivery', many=True, read_only=True,
+        help_text='The delivery history of the rider'
+    )
+    
+    # Add a write-only email field (since the Rider model does not have an email field).
+    email = serializers.EmailField(write_only=True, required=True)
+
+    # New fields: retrieve related user data from the associated User, commissioner, and boss.
+    user_data = UserSimpleSerializer(source='user', read_only=True)
+    commissioner_data = UserSimpleSerializer(source='commissioner', read_only=True)
+    boss_data = UserSimpleSerializer(source='boss', read_only=True)
 
     class Meta:
         model = Rider
-        fields = ['id', 'name', 'phone_number', 'address', 'code', 'nid', 'image', 'permit_image', 'plate_number', 'insurance', 'delivery_history']
-        read_only_fields = ['code', 'delivery_history']
+        fields = [
+            'id', 'name', 'email', 'phone_number', 'address', 'code', 'nid',
+            'image', 'permit_image', 'plate_number', 'insurance', 'delivery_history',
+            # New nested data fields:
+            'user_data', 'commissioner_data', 'boss_data',
+        ]
+        read_only_fields = ['code', 'delivery_history', 'user_data', 'commissioner_data', 'boss_data']
 
     def generate_unique_code(self, name):
         """
-        Generates a unique code based on name initials and a random 8-digit number.
+        Generates a unique code based on the first two initials of the name and a random 8-digit number.
         Ensures uniqueness by checking against existing codes in the Rider model.
         """
-        # Extract initials (first letters of each name)
-        initials = ''.join([part[0].upper() for part in name.split() if part])[:2]  # Only the first 2 initials
-
-        # Generate a unique code by appending an 8-digit random number
+        # Extract the first two initials from the provided name
+        initials = ''.join([part[0].upper() for part in name.split() if part])[:2]
+        # Attempt generating a unique code in a loop
         while True:
             random_number = ''.join([str(random.randint(0, 9)) for _ in range(8)])
             code = f"{initials}{random_number}"
-
-            # Check if the generated code is unique
             if not Rider.objects.filter(code=code).exists():
                 return code
 
     def create(self, validated_data):
         """
-        Overrides create method to generate and set a unique code for each Rider.
+        Overrides the default create behavior:
+          - Extracts the required fields for the User model.
+          - Creates a corresponding User record with default password "Password!7".
+          - Associates the created user with the new Rider.
+          - Generates a unique code for the Rider.
         """
-        # Extract name from validated data to generate the code
+        # Extract required fields for creating the User record.
         name = validated_data.get('name', '')
+        phone_number = validated_data.get('phone_number', '')
+        email = validated_data.pop('email')  # Remove email from validated_data as Rider model doesn't use it.
+
+        # Generate the unique rider code.
         validated_data['code'] = self.generate_unique_code(name)
 
-        # Create and return the Rider instance
-        return super().create(validated_data)
+        # Create the corresponding user record.
+        User = get_user_model()
+        try:
+            user = User.objects.create_user(
+                name=name,
+                email=email,
+                phone_number=phone_number,
+                password="Password!7"
+            )
+        except Exception as e:
+            raise serializers.ValidationError({
+                "user_creation": "Could not create associated user account.",
+                "detail": str(e)
+            })
+
+        # Link the created user to the Rider.
+        validated_data['user'] = user
+
+        # Create and return the Rider instance.
+        rider = super().create(validated_data)
+        return rider
 
     def update(self, instance, validated_data):
-        # Handle image upload separately if provided
+        """
+        Update instance while handling image uploads if provided.
+        """
         if 'image' in validated_data:
             instance.image = validated_data.pop('image')
 
-        # Update the other fields
+        # Update the remaining fields.
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        
+
         instance.save()
         return instance
 
     def to_representation(self, instance):
         """
-        Override to_representation to include delivery_history only when retrieving a single Rider.
+        Optionally include delivery_history only for single retrieve operations.
         """
         representation = super().to_representation(instance)
         request = self.context.get('request')
-        if request and request.method == 'GET' and 'pk' in self.context.get('view').kwargs:
-            # Include delivery_history only for retrieve operations
-            representation['delivery_history'] = RiderDeliverySerializer(instance.rider_delivery.all(), many=True).data
+        view = self.context.get('view')
+        if request and view and 'pk' in view.kwargs:
+            representation['delivery_history'] = RiderDeliverySerializer(
+                instance.rider_delivery.all(), many=True
+            ).data
         else:
-            # Optionally, omit or include minimal delivery_history for list operations
             representation.pop('delivery_history', None)
         return representation
 
