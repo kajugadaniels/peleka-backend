@@ -76,6 +76,16 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
         return instance
 
 class RiderDeliverySerializer(serializers.ModelSerializer):
+    """
+    Serializer for the RiderDelivery model.
+    
+    This serializer retrieves comprehensive details about the rider, delivery request,
+    and associated client/recipient details. Additionally, it now includes
+    the IDs of the rider's linked User account, the commissioner, and the boss.
+
+    It also performs validations to ensure that a rider is available for assignment
+    and updates timestamps and statuses during creation and update operations.
+    """
     # Rider information fields
     rider_id = serializers.ReadOnlyField(source='rider.id', help_text='The ID of the rider')
     rider_name = serializers.ReadOnlyField(source='rider.name', help_text='The name of the rider')
@@ -84,8 +94,8 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
     rider_code = serializers.ReadOnlyField(source='rider.code', help_text='The unique code of the rider')
     rider_nid = serializers.ReadOnlyField(source='rider.nid', help_text='The national ID of the rider')
     rider_image = serializers.ImageField(source='rider.image', help_text='The image of the rider', read_only=True)
-
-    # Fields to retrieve associated User, Commissioner, and Boss IDs
+    
+    # New fields to retrieve associated User, Commissioner, and Boss IDs
     rider_user_id = serializers.ReadOnlyField(source='rider.user.id', help_text="The ID of the rider's associated User account")
     commissioner_id = serializers.ReadOnlyField(source='rider.commissioner.id', help_text="The ID of the rider's assigned commissioner")
     boss_id = serializers.ReadOnlyField(source='rider.boss.id', help_text="The ID of the rider's assigned boss")
@@ -94,16 +104,16 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
     package_name = serializers.ReadOnlyField(source='delivery_request.package_name', help_text='Name of the package')
     delivery_request_id = serializers.ReadOnlyField(source='delivery_request.id', help_text='The ID of the delivery request')
     pickup_address = serializers.ReadOnlyField(source='delivery_request.pickup_address', help_text='The pickup address of the delivery request')
-    pickup_lat = serializers.ReadOnlyField(source='delivery_request.pickup_lat', help_text='The pickup address of the delivery request')
-    pickup_lng = serializers.ReadOnlyField(source='delivery_request.pickup_lng', help_text='The pickup address of the delivery request')
+    pickup_lat = serializers.ReadOnlyField(source='delivery_request.pickup_lat', help_text='Latitude of the pickup location')
+    pickup_lng = serializers.ReadOnlyField(source='delivery_request.pickup_lng', help_text='Longitude of the pickup location')
     delivery_address = serializers.ReadOnlyField(source='delivery_request.delivery_address', help_text='The delivery address of the delivery request')
-    delivery_lat = serializers.ReadOnlyField(source='delivery_request.delivery_lat', help_text='The delivery address of the delivery request')
-    delivery_lng = serializers.ReadOnlyField(source='delivery_request.delivery_lng', help_text='The delivery address of the delivery request')
+    delivery_lat = serializers.ReadOnlyField(source='delivery_request.delivery_lat', help_text='Latitude of the delivery location')
+    delivery_lng = serializers.ReadOnlyField(source='delivery_request.delivery_lng', help_text='Longitude of the delivery location')
     package_description = serializers.ReadOnlyField(source='delivery_request.package_description', help_text='Description of the package')
     estimated_distance_km = serializers.ReadOnlyField(source='delivery_request.estimated_distance_km', help_text='The estimated distance in kilometers')
     estimated_delivery_time = serializers.ReadOnlyField(source='delivery_request.estimated_delivery_time', help_text='The estimated delivery time')
     value_of_product = serializers.ReadOnlyField(source='delivery_request.value_of_product', help_text='The value of the product being delivered')
-    delivery_price = serializers.ReadOnlyField(source='delivery_request.delivery_price', help_text='The delivery price calculated')
+    delivery_price = serializers.ReadOnlyField(source='delivery_request.delivery_price', help_text='The calculated delivery price')
     status = serializers.ReadOnlyField(source='delivery_request.status', help_text='The status of the delivery request')
 
     # Client information
@@ -111,17 +121,19 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
     client_phone_number = serializers.ReadOnlyField(source='delivery_request.client.phone_number', help_text='The phone number of the client')
 
     # Recipient information
-    recipient_name = serializers.ReadOnlyField(source='delivery_request.recipient_name', help_text='The name of the client')
-    recipient_phone = serializers.ReadOnlyField(source='delivery_request.recipient_phone', help_text='The phone number of the client')
+    recipient_name = serializers.ReadOnlyField(source='delivery_request.recipient_name', help_text='The name of the recipient')
+    recipient_phone = serializers.ReadOnlyField(source='delivery_request.recipient_phone', help_text='The phone number of the recipient')
 
-    created_at = serializers.ReadOnlyField(source='delivery_request.created_at', help_text='The creation date of the delivery request')
-    updated_at = serializers.ReadOnlyField(source='delivery_request.updated_at', help_text='The last update date of the delivery request')
+    # Timestamps
+    created_at = serializers.ReadOnlyField(source='delivery_request.created_at', help_text='Creation date of the delivery request')
+    updated_at = serializers.ReadOnlyField(source='delivery_request.updated_at', help_text='Last update date of the delivery request')
 
     class Meta:
         model = RiderDelivery
         fields = [
             'id', 'rider_id', 'rider_name', 'rider_phone_number', 'rider_address', 'rider_code',
-            'rider_nid', 'rider_image', 'delivered', 'last_assigned_at', 'package_name',
+            'rider_nid', 'rider_image', 'rider_user_id', 'commissioner_id', 'boss_id',
+            'delivered', 'last_assigned_at', 'package_name',
             'delivery_request_id', 'pickup_address', 'pickup_lat', 'pickup_lng', 'delivery_address', 'delivery_lat', 'delivery_lng',
             'package_description', 'estimated_distance_km', 'estimated_delivery_time',
             'value_of_product', 'delivery_price', 'status', 'client_name',
@@ -130,7 +142,8 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'rider_id', 'rider_name', 'rider_phone_number', 'rider_address',
-            'rider_code', 'rider_nid', 'rider_image', 'last_assigned_at', 'package_name',
+            'rider_code', 'rider_nid', 'rider_image', 'rider_user_id', 'commissioner_id', 'boss_id',
+            'last_assigned_at', 'package_name',
             'delivery_request_id', 'pickup_address', 'pickup_lat', 'pickup_lng', 'delivery_address', 'delivery_lat', 'delivery_lng',
             'package_description', 'estimated_distance_km', 'estimated_delivery_time',
             'value_of_product', 'delivery_price', 'status', 'client_name',
@@ -139,19 +152,27 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
-        """Ensure that a rider can be assigned only if they are available."""
+        """
+        Ensure that the selected rider is available for a new delivery assignment.
+        
+        A rider is considered unavailable if there is already an in-progress (undelivered)
+        delivery assignment for them.
+        """
         rider = self.initial_data.get('rider')
         if rider and RiderDelivery.objects.filter(rider=rider).exclude(delivered=True).exists():
             raise serializers.ValidationError("Rider is currently unavailable for a new delivery assignment.")
         return data
 
     def create(self, validated_data):
-        """Create a new RiderDelivery instance with assigned_at and in_progress_at set to current time."""
+        """
+        Create a new RiderDelivery instance.
+        
+        Sets default values for 'delivered' and 'assigned_at'. Additionally, it updates
+        the associated delivery request's status to 'Accepted'.
+        """
         validated_data['delivered'] = False
         validated_data['assigned_at'] = timezone.now()
-        # validated_data['in_progress_at'] = timezone.now()
 
-        # Update the delivery request status
         delivery_request = validated_data.get('delivery_request')
         if delivery_request:
             delivery_request.status = 'Accepted'
@@ -160,14 +181,18 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        """Handle the update logic to change the rider's delivery assignment."""
-        # Update delivered status
+        """
+        Update a RiderDelivery instance.
+        
+        Handles updating the delivered status. When a delivery is marked as delivered,
+        the delivered_at timestamp is set, and the associated delivery request's status
+        is updated to 'Completed'.
+        """
         delivered = validated_data.get('delivered')
         if delivered is not None:
             instance.delivered = delivered
             if delivered:
                 instance.delivered_at = timezone.now()
-                # Optionally, update the delivery_request status
                 if instance.delivery_request:
                     instance.delivery_request.status = 'Completed'
                     instance.delivery_request.save()
