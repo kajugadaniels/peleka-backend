@@ -166,10 +166,10 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """
         Create a new RiderDelivery instance.
-        
+
         Sets default values for 'delivered' and 'assigned_at', and updates the associated
         delivery request's status to 'Accepted'. Then, dispatches the delivery_price into
-        the appropriate wallet shares for the rider, commissioner, and boss using the 
+        the appropriate wallet shares (rider, commissioner, and boss) using the 
         Transaction and TransactionHistory models.
         """
         validated_data['delivered'] = False
@@ -185,20 +185,26 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         rider_delivery = super().create(validated_data)
 
         try:
-            # Extract the delivery price as a Decimal; default to 0 if missing.
+            # Attempt to get and convert the delivery price.
             if delivery_request and delivery_request.delivery_price:
-                price = Decimal(delivery_request.delivery_price)
+                try:
+                    # Ensure the value is converted from string properly
+                    price = Decimal(str(delivery_request.delivery_price))
+                except Exception as conv_error:
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Error converting delivery_price to Decimal: {conv_error}")
+                    price = Decimal('0.00')
             else:
                 price = Decimal('0.00')
 
             # Calculate shares:
-            # If a commissioner is assigned to the rider, then:
+            # If a commissioner is assigned, then:
             #   rider: 90%, commissioner: 3%, boss: 7%
             # Otherwise:
             #   rider: 90%, commissioner: 0%, boss: 10%
             rider_share = (price * Decimal('0.90')).quantize(Decimal('0.01'))
             rider_instance = rider_delivery.rider
-            commissioner_obj = rider_instance.commissioner  # May be None
+            commissioner_obj = rider_instance.commissioner  # may be None
             boss_obj = rider_instance.boss
 
             if commissioner_obj:
@@ -208,12 +214,12 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
                 commission_share = Decimal('0.00')
                 boss_share = (price * Decimal('0.10')).quantize(Decimal('0.01'))
 
-            # Retrieve associated User objects
+            # Retrieve the associated User objects from the Rider model.
             rider_user = rider_instance.user
             commissioner_user = commissioner_obj.user if commissioner_obj else None
             boss_user = boss_obj.user if boss_obj else None
 
-            # Get or create the wallet (Transaction) record for this grouping
+            # Get or create a wallet (Transaction) record for this group
             transaction_obj, created = Transaction.objects.get_or_create(
                 rider=rider_user,
                 commissioner=commissioner_user,
@@ -224,7 +230,7 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
                     'boss_total': Decimal('0.00'),
                 }
             )
-            # Update totals
+            # Update wallet totals
             transaction_obj.rider_total += rider_share
             if commissioner_user:
                 transaction_obj.commissioner_total += commission_share
