@@ -141,18 +141,88 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        """Create a new RiderDelivery instance with assigned_at and in_progress_at set to current time."""
+        """
+        Create a new RiderDelivery instance with assigned_at and in_progress_at set to the current time.
+        Also dispatch the delivery_price from the associated DeliveryRequest into transaction shares:
+          - Rider: 90%
+          - Commissioner: 3% (if present)
+          - Boss: 7% (if commissioner exists) or 10% (if no commissioner)
+        Then update (or create) the corresponding Transaction record and create a TransactionHistory record.
+        """
         validated_data['delivered'] = False
-        validated_data['assigned_at'] = timezone.now()
-        # validated_data['in_progress_at'] = timezone.now()
+        now = timezone.now()
+        validated_data['assigned_at'] = now
+        validated_data['in_progress_at'] = now
 
-        # Update the delivery request status
+        # Update the delivery request status to 'In Progress'
         delivery_request = validated_data.get('delivery_request')
         if delivery_request:
-            delivery_request.status = 'Accepted'
+            delivery_request.status = 'In Progress'
             delivery_request.save()
 
-        return super().create(validated_data)
+        # Create the RiderDelivery instance
+        rider_delivery = super().create(validated_data)
+
+        try:
+            # Retrieve and convert the delivery price to Decimal
+            if delivery_request and delivery_request.delivery_price:
+                delivery_price = Decimal(delivery_request.delivery_price)
+            else:
+                delivery_price = Decimal('0.00')
+
+            # Calculate each party's share
+            rider_share = (delivery_price * Decimal('0.90')).quantize(Decimal('0.01'))
+            rider_instance = rider_delivery.rider
+            # Get commissioner and boss from the Rider model instance
+            commissioner_obj = rider_instance.commissioner  # May be None
+            boss_obj = rider_instance.boss
+            if commissioner_obj:
+                commission_share = (delivery_price * Decimal('0.03')).quantize(Decimal('0.01'))
+                boss_share = (delivery_price * Decimal('0.07')).quantize(Decimal('0.01'))
+            else:
+                commission_share = Decimal('0.00')
+                boss_share = (delivery_price * Decimal('0.10')).quantize(Decimal('0.01'))
+
+            # Use the related User objects from the Rider model (the field 'user' on Rider)
+            rider_user = rider_instance.user
+            commissioner_user = commissioner_obj.user if commissioner_obj else None
+            boss_user = boss_obj.user if boss_obj else None
+
+            # Get or create the wallet (Transaction) record for this set of users
+            transaction_obj, created = Transaction.objects.get_or_create(
+                rider=rider_user,
+                commissioner=commissioner_user,
+                boss=boss_user,
+                defaults={
+                    'rider_total': Decimal('0.00'),
+                    'commissioner_total': Decimal('0.00'),
+                    'boss_total': Decimal('0.00')
+                }
+            )
+            # Update wallet totals
+            transaction_obj.rider_total += rider_share
+            if commissioner_user:
+                transaction_obj.commissioner_total += commission_share
+                transaction_obj.boss_total += boss_share
+            else:
+                # If there is no commissioner, add the entire boss share (10% overall)
+                transaction_obj.boss_total += boss_share
+            transaction_obj.save()
+
+            # Create a history record for this transaction event
+            TransactionHistory.objects.create(
+                transaction=transaction_obj,
+                delivery_request=delivery_request,
+                rider_amount=rider_share,
+                commissioner_amount=commission_share,
+                boss_amount=boss_share
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error dispatching transaction: {e}")
+
+        return rider_delivery
 
     def update(self, instance, validated_data):
         """Handle the update logic to change the rider's delivery assignment."""
