@@ -1,5 +1,4 @@
 import random
-import logging
 from system.models import *
 from transactions.models import *
 from rest_framework import serializers
@@ -82,10 +81,12 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
     Serializer for the RiderDelivery model.
     
     This serializer retrieves comprehensive details about the rider, delivery request,
-    associated client/recipient details, and now includes the IDs for the rider’s linked
-    User account, the commissioner, and the boss.
-    """
+    and associated client/recipient details. Additionally, it now includes
+    the IDs of the rider's linked User account, the commissioner, and the boss.
 
+    It also performs validations to ensure that a rider is available for assignment
+    and updates timestamps and statuses during creation and update operations.
+    """
     # Rider information fields
     rider_id = serializers.ReadOnlyField(source='rider.id', help_text='The ID of the rider')
     rider_name = serializers.ReadOnlyField(source='rider.name', help_text='The name of the rider')
@@ -166,92 +167,19 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """
         Create a new RiderDelivery instance.
-
-        Sets default values for 'delivered' and 'assigned_at', and updates the associated
-        delivery request's status to 'Accepted'. Then, dispatches the delivery_price into
-        the appropriate wallet shares (rider, commissioner, and boss) using the 
-        Transaction and TransactionHistory models.
+        
+        Sets default values for 'delivered' and 'assigned_at'. Additionally, it updates
+        the associated delivery request's status to 'Accepted'.
         """
         validated_data['delivered'] = False
         validated_data['assigned_at'] = timezone.now()
 
         delivery_request = validated_data.get('delivery_request')
         if delivery_request:
-            # Update the delivery request status to 'Accepted'
             delivery_request.status = 'Accepted'
             delivery_request.save()
 
-        # Create the RiderDelivery instance
-        rider_delivery = super().create(validated_data)
-
-        try:
-            # Attempt to get and convert the delivery price.
-            if delivery_request and delivery_request.delivery_price:
-                try:
-                    # Ensure the value is converted from string properly
-                    price = Decimal(str(delivery_request.delivery_price))
-                except Exception as conv_error:
-                    logger = logging.getLogger(__name__)
-                    logger.error(f"Error converting delivery_price to Decimal: {conv_error}")
-                    price = Decimal('0.00')
-            else:
-                price = Decimal('0.00')
-
-            # Calculate shares:
-            # If a commissioner is assigned, then:
-            #   rider: 90%, commissioner: 3%, boss: 7%
-            # Otherwise:
-            #   rider: 90%, commissioner: 0%, boss: 10%
-            rider_share = (price * Decimal('0.90')).quantize(Decimal('0.01'))
-            rider_instance = rider_delivery.rider
-            commissioner_obj = rider_instance.commissioner  # may be None
-            boss_obj = rider_instance.boss
-
-            if commissioner_obj:
-                commission_share = (price * Decimal('0.03')).quantize(Decimal('0.01'))
-                boss_share = (price * Decimal('0.07')).quantize(Decimal('0.01'))
-            else:
-                commission_share = Decimal('0.00')
-                boss_share = (price * Decimal('0.10')).quantize(Decimal('0.01'))
-
-            # Retrieve the associated User objects from the Rider model.
-            rider_user = rider_instance.user
-            commissioner_user = commissioner_obj.user if commissioner_obj else None
-            boss_user = boss_obj.user if boss_obj else None
-
-            # Get or create a wallet (Transaction) record for this group
-            transaction_obj, created = Transaction.objects.get_or_create(
-                rider=rider_user,
-                commissioner=commissioner_user,
-                boss=boss_user,
-                defaults={
-                    'rider_total': Decimal('0.00'),
-                    'commissioner_total': Decimal('0.00'),
-                    'boss_total': Decimal('0.00'),
-                }
-            )
-            # Update wallet totals
-            transaction_obj.rider_total += rider_share
-            if commissioner_user:
-                transaction_obj.commissioner_total += commission_share
-                transaction_obj.boss_total += boss_share
-            else:
-                transaction_obj.boss_total += boss_share
-            transaction_obj.save()
-
-            # Create a history record for this transaction event
-            TransactionHistory.objects.create(
-                transaction=transaction_obj,
-                delivery_request=delivery_request,
-                rider_amount=rider_share,
-                commissioner_amount=commission_share,
-                boss_amount=boss_share
-            )
-        except Exception as e:
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error dispatching transaction amounts: {e}")
-
-        return rider_delivery
+        return super().create(validated_data)
 
     def update(self, instance, validated_data):
         """
