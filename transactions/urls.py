@@ -6,5 +6,5 @@ from django.conf.urls.static import static
 app_name = 'transactions'
 
 urlpatterns = [
-    
+    path('', TransactionListView.as_view(), name='transaction_list'),
 ]  + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
