@@ -240,6 +240,11 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+class UserSimpleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = get_user_model()  # This is your custom User model.
+        fields = ['id', 'name', 'email', 'phone_number']
+
 class RiderSerializer(serializers.ModelSerializer):
     """
     Serializer for the Rider model.
@@ -260,13 +265,20 @@ class RiderSerializer(serializers.ModelSerializer):
     # Add a write-only email field (since the Rider model does not have an email field).
     email = serializers.EmailField(write_only=True, required=True)
 
+    # New fields: retrieve related user data from the associated User, commissioner, and boss.
+    user_data = UserSimpleSerializer(source='user', read_only=True)
+    commissioner_data = UserSimpleSerializer(source='commissioner', read_only=True)
+    boss_data = UserSimpleSerializer(source='boss', read_only=True)
+
     class Meta:
         model = Rider
         fields = [
             'id', 'name', 'email', 'phone_number', 'address', 'code', 'nid',
-            'image', 'permit_image', 'plate_number', 'insurance', 'delivery_history'
+            'image', 'permit_image', 'plate_number', 'insurance', 'delivery_history',
+            # New nested data fields:
+            'user_data', 'commissioner_data', 'boss_data',
         ]
-        read_only_fields = ['code', 'delivery_history']
+        read_only_fields = ['code', 'delivery_history', 'user_data', 'commissioner_data', 'boss_data']
 
     def generate_unique_code(self, name):
         """
@@ -308,8 +320,10 @@ class RiderSerializer(serializers.ModelSerializer):
                 password="Password!7"
             )
         except Exception as e:
-            # You might want to log the error and raise a more specific exception.
-            raise serializers.ValidationError({"user_creation": "Could not create associated user account.", "detail": str(e)})
+            raise serializers.ValidationError({
+                "user_creation": "Could not create associated user account.",
+                "detail": str(e)
+            })
 
         # Link the created user to the Rider.
         validated_data['user'] = user
@@ -340,7 +354,9 @@ class RiderSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         view = self.context.get('view')
         if request and view and 'pk' in view.kwargs:
-            representation['delivery_history'] = RiderDeliverySerializer(instance.rider_delivery.all(), many=True).data
+            representation['delivery_history'] = RiderDeliverySerializer(
+                instance.rider_delivery.all(), many=True
+            ).data
         else:
             representation.pop('delivery_history', None)
         return representation
