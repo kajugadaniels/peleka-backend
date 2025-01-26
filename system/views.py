@@ -945,6 +945,54 @@ class DeleteBookRiderView(generics.DestroyAPIView):
             'data': BookRiderSerializer(book_rider).data
         }, status=status.HTTP_200_OK)
 
+class CompleteBookRiderView(generics.UpdateAPIView):
+    """
+     API view to mark a BookRider as Completed.
+    - Accessible to any authenticated user.
+    - Only updates the status to 'Completed'.
+    - If the assignment is 'Cancelled' or not 'In Progress', returns an error.
+    - Also updates related BookRider status to 'Completed'.
+    """
+    queryset = BookRider.objects.all()
+    serializer_class = BookRiderCompleteSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def patch(self, request, *args, **kwargs):
+        book_rider = self.get_object()
+
+        if book_rider.status == 'Completed':
+            return Response(
+                {'message': 'The rider booking request is already completed.'},
+                status=status.HTTP_200_OK
+            )
+
+        # Set status to 'Completed'
+        book_rider.status = 'Completed'
+        book_rider.save()
+
+        # Update related BookRiderAssignment records
+        rider_assignment = BookRiderAssignment.objects.filter(
+            book_rider=book_rider,
+            delivered=False
+        )
+        updated_count = rider_assignment.update(
+            delivered=True,
+            status="Completed",
+            completed_at=timezone.now()
+        )
+
+        # Serialize the updated delivery request
+        serializer = BookRiderSerializer(book_rider)
+
+        return Response(
+            {
+                'message': 'Rider booking request marked as completed successfully.',
+                'data': serializer.data,
+                'rider_assignment_updated': updated_count
+            },
+            status=status.HTTP_200_OK
+        )
+
 class BookRiderAssignmentListView(generics.ListAPIView):
     """
     API view to list all Book Rider Assignments.
@@ -1226,50 +1274,3 @@ class DeleteBookRiderAssignmentView(generics.DestroyAPIView):
             'message': "Book rider assignment cancelled successfully.",
             'data': BookRiderAssignmentSerializer(assignment).data
         }, status=status.HTTP_200_OK)
-
-class CompleteBookRiderAssignmentView(generics.UpdateAPIView):
-    """
-    API view to mark a BookRiderAssignment as Completed.
-    - Accessible to any authenticated user.
-    - Only updates the status to 'Completed'.
-    - If the assignment is 'Cancelled' or not 'In Progress', returns an error.
-    - Also updates related BookRider status to 'Completed'.
-    """
-    queryset = BookRiderAssignment.objects.all()
-    serializer_class = BookRiderAssignmentCompleteSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def patch(self, request, *args, **kwargs):
-        """
-        Handle PATCH requests to mark the assignment as completed.
-        """
-        assignment = self.get_object()
-
-        if assignment.status == 'Completed':
-            return Response(
-                {'message': 'The book rider assignment is already completed.'},
-                status=status.HTTP_200_OK
-            )
-        
-        # Serialize the incoming data to set status to 'Completed'
-        serializer = self.get_serializer(assignment, data={'status': 'Completed'}, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-
-        return Response(
-            {
-                'message': 'Book rider assignment marked as completed successfully.',
-                'data': BookRiderAssignmentSerializer(assignment, context={'request': request}).data
-            },
-            status=status.HTTP_200_OK
-        )
-
-    def get_object(self):
-        """
-        Retrieve and return the BookRiderAssignment instance by ID.
-        - Ensure the assignment is not deleted.
-        """
-        try:
-            return BookRiderAssignment.objects.get(pk=self.kwargs['pk'], book_rider__delete_status=False)
-        except BookRiderAssignment.DoesNotExist:
-            raise NotFound({'message': "Book rider assignment not found."})

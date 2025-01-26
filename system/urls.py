@@ -43,5 +43,4 @@ urlpatterns = [
     path('book-rider-assignment/<int:pk>/', BookRiderAssignmentDetailView.as_view(), name='bookRiderAssignmentDetail'),
     path('book-rider-assignment/update/<int:pk>/', UpdateBookRiderAssignmentView.as_view(), name='updateBookRiderAssignment'),
     path('book-rider-assignment/delete/<int:pk>/', DeleteBookRiderAssignmentView.as_view(), name='deleteBookRiderAssignment'),
-    path('book-rider-assignment/<int:pk>/complete/', CompleteBookRiderAssignmentView.as_view(), name='completeBookRiderAssignment'),
 ]  + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
