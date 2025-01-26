@@ -393,7 +393,7 @@ class BookRiderAssignmentSerializer(serializers.ModelSerializer):
         model = BookRiderAssignment
         fields = [
             'id', 'book_rider', 'client_name', 'client_phone', 'rider', 'rider_name', 'rider_phone_number',
-            'assigned_at', 'in_progress_at', 'completed_at', 'cancelled_at', 'status',
+            'assigned_at', 'in_progress_at', 'completed_at', 'cancelled_at', 'status', 'delivered',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
