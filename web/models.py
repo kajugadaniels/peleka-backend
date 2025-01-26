@@ -42,7 +42,7 @@ class Contact(models.Model):
 class BookRider(models.Model):
     STATUS_CHOICES = [
         ('Pending', 'Pending'),
-        ('Confirmed', 'Confirmed'),
+        ('Accepted', 'Accepted'),
         ('In Progress', 'In Progress'),
         ('Completed', 'Completed'),
         ('Cancelled', 'Cancelled'),

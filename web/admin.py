@@ -61,7 +61,7 @@ class BookRiderAdmin(admin.ModelAdmin):
 class BookRiderAssignmentAdmin(admin.ModelAdmin):
     list_display = (
         'id', 'book_rider', 'rider', 'assigned_at',
-        'in_progress_at', 'completed_at', 'cancelled_at', 'status'
+        'in_progress_at', 'completed_at', 'cancelled_at', 'delivered', 'status'
     )
     search_fields = (
         'book_rider__client__username', 'rider__name', 'status'
