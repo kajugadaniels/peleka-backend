@@ -180,6 +180,7 @@ class RiderDelivery(models.Model):
 class BookRiderAssignment(models.Model):
     book_rider = models.ForeignKey(BookRider, on_delete=models.CASCADE, related_name='assignments', help_text='The booking request to which the rider is assigned')
     rider = models.ForeignKey(Rider, on_delete=models.CASCADE, related_name='book_rider_assignments', help_text='The rider assigned to the booking')
+    delivered = models.BooleanField(default=False, help_text='Indicates whether the delivery has been completed')
     assigned_at = models.DateTimeField(blank=True, null=True, help_text='Timestamp when the rider was assigned')
     in_progress_at = models.DateTimeField(blank=True, null=True, help_text='Timestamp when the booking started')
     completed_at = models.DateTimeField(blank=True, null=True, help_text='Timestamp when the booking was completed')

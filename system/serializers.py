@@ -410,13 +410,13 @@ class BookRiderAssignmentSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """
         Assign a rider to a BookRider request.
-        Automatically sets the assigned_at timestamp and updates the BookRider status to 'Confirmed'.
+        Automatically sets the assigned_at timestamp and updates the BookRider status to 'Accepted'.
         """
         rider = validated_data.get('rider')
         book_rider = validated_data.get('book_rider')
         
         # Check if the rider is available (no active assignments)
-        if BookRiderAssignment.objects.filter(rider=rider, status__in=['Pending', 'Confirmed', 'In Progress']).exists():
+        if BookRiderAssignment.objects.filter(rider=rider, status__in=['Pending', 'Accepted', 'In Progress']).exists():
             raise serializers.ValidationError("This rider is currently unavailable for a new assignment.")
         
         # Create the assignment
@@ -424,11 +424,11 @@ class BookRiderAssignmentSerializer(serializers.ModelSerializer):
             book_rider=book_rider,
             rider=rider,
             assigned_at=timezone.now(),
-            status='Confirmed'
+            status='Accepted'
         )
         
         # Update the BookRider status
-        book_rider.status = 'Confirmed'
+        book_rider.status = 'Accepted'
         book_rider.save()
         
         return assignment
@@ -444,7 +444,7 @@ class BookRiderAssignmentSerializer(serializers.ModelSerializer):
         if 'rider' in validated_data:
             new_rider = validated_data.pop('rider')
             # Check if the new rider is available
-            if BookRiderAssignment.objects.filter(rider=new_rider, status__in=['Pending', 'Confirmed', 'In Progress']).exists():
+            if BookRiderAssignment.objects.filter(rider=new_rider, status__in=['Pending', 'Accepted', 'In Progress']).exists():
                 raise serializers.ValidationError("The new rider is currently unavailable for assignment.")
             instance.rider = new_rider
             instance.assigned_at = timezone.now()

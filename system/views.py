@@ -786,7 +786,7 @@ class BookRiderListView(generics.ListAPIView):
         if user.has_perm('web.view_bookrider'):
             return BookRider.objects.filter(
                 delete_status=False,
-                status__in=['Pending', 'Confirmed']
+                status__in=['Pending', 'Accepted']
             ).order_by('-created_at')
 
         # If the user does not have the required permission, return an empty queryset
@@ -978,24 +978,17 @@ class BookRiderAssignmentListView(generics.ListAPIView):
 
 class AddBookRiderAssignmentView(generics.CreateAPIView):
     """
-    API view to assign a rider to a BookRider request.
-    - Accessible only to authenticated users with 'add_bookriderassignment' permission.
-    - Automatically updates the BookRider status to "Confirmed" upon assignment.
+    API view to assign a rider to a booking rider.
+    - Accessible only to authenticated users with appropriate permissions.
+    - Updates the booking rider status to "Accepted" upon assignment.
     - Dispatches the booking_price split (rider, commissioner, boss) into
       the Transaction and TransactionHistory models.
     """
-    queryset = BookRiderAssignment.objects.all().order_by('-assigned_at')
+    queryset = BookRiderAssignment.objects.all().order_by('-id')
     serializer_class = BookRiderAssignmentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        """
-        Handle the creation of a new book rider assignment.
-        """
-        # Check if the user has permission to add a book rider assignment
-        if not request.user.has_perm('system.add_bookriderassignment'):
-            raise PermissionDenied({'message': "You do not have permission to assign riders to book rider requests."})
-
         rider_id = request.data.get('rider_id')
         book_rider_id = request.data.get('book_rider_id')
 
@@ -1006,19 +999,18 @@ class AddBookRiderAssignmentView(generics.CreateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Fetch the rider and book rider objects
+        # Fetch the rider and booking rider objects
         try:
             rider = Rider.objects.get(id=rider_id)
         except Rider.DoesNotExist:
             raise NotFound({'message': "Rider not found."})
-
         try:
             book_rider = BookRider.objects.get(id=book_rider_id)
         except BookRider.DoesNotExist:
-            raise NotFound({'message': "BookRider request not found."})
+            raise NotFound({'message': "booking rider not found."})
 
         # Check if the rider is available (no active, undelivered BookRiderAssignment)
-        if BookRiderAssignment.objects.filter(rider=rider, status__in=['Pending', 'Confirmed', 'In Progress']).exists():
+        if BookRiderAssignment.objects.filter(rider=rider, delivered=False).exists():
             return Response(
                 {'message': "This rider is not available at the moment."},
                 status=status.HTTP_400_BAD_REQUEST
@@ -1027,17 +1019,16 @@ class AddBookRiderAssignmentView(generics.CreateAPIView):
         # Wrap the entire operation in an atomic transaction.
         try:
             with transaction.atomic():
-                # Assign the rider by creating a new BookRiderAssignment entry with status='Pending'
-                assignment = BookRiderAssignment.objects.create(
-                    book_rider=book_rider,
+                # Create the BookRiderAssignment entry
+                rider_booking = BookRiderAssignment.objects.create(
                     rider=rider,
-                    status='Pending',
+                    book_rider=book_rider,
+                    delivered=False,
                     assigned_at=timezone.now(),
-                    # last_assigned_at=timezone.now()
                 )
 
-                # Update the BookRider status to "Confirmed"
-                book_rider.status = 'Confirmed'
+                # Update the booking rider's status to "Accepted"
+                book_rider.status = 'Accepted'
                 book_rider.save()
 
                 # --- TRANSACTION DISPATCH LOGIC ---
@@ -1068,6 +1059,7 @@ class AddBookRiderAssignmentView(generics.CreateAPIView):
                 logger.debug(f"Calculated shares: rider_share={rider_share}, commission_share={commission_share}, boss_share={boss_share}")
 
                 # Retrieve associated User objects.
+                # rider.user is the associated user from the Rider model.
                 rider_user = rider.user
                 commissioner_user = commissioner_obj  if commissioner_obj else None  # Use directly
                 boss_user = boss_obj if boss_obj else None  # Use directly
@@ -1096,26 +1088,22 @@ class AddBookRiderAssignmentView(generics.CreateAPIView):
                 # Create a TransactionHistory record for this event
                 TransactionHistory.objects.create(
                     transaction=transaction_obj,
-                    booking_request=booking_request,  # No delivery_request associated with BookRiderAssignment
+                    book_rider=book_rider,
                     rider_amount=rider_share,
                     commissioner_amount=commission_share,
                     boss_amount=boss_share
                 )
                 logger.debug("TransactionHistory record created successfully.")
-
         except Exception as e:
             logger.error(f"Error dispatching transaction amounts: {e}", exc_info=True)
-            return Response(
-                {'message': "An error occurred while assigning the rider. Please try again later."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            raise e
 
         # Serialize and return the created BookRiderAssignment
-        serializer = self.get_serializer(assignment)
+        serializer = self.get_serializer(rider_booking)
         return Response(
             {
-                'message': "Rider assigned to BookRider request successfully.",
-                'book_rider_assignment': serializer.data
+                'message': "Rider assigned to booking rider successfully.",
+                'rider_booking': serializer.data
             },
             status=status.HTTP_201_CREATED
         )
