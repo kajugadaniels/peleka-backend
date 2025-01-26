@@ -1033,7 +1033,7 @@ class AddBookRiderAssignmentView(generics.CreateAPIView):
                     rider=rider,
                     status='Pending',
                     assigned_at=timezone.now(),
-                    last_assigned_at=timezone.now()
+                    # last_assigned_at=timezone.now()
                 )
 
                 # Update the BookRider status to "Confirmed"
@@ -1096,7 +1096,7 @@ class AddBookRiderAssignmentView(generics.CreateAPIView):
                 # Create a TransactionHistory record for this event
                 TransactionHistory.objects.create(
                     transaction=transaction_obj,
-                    delivery_request=None,  # No delivery_request associated with BookRiderAssignment
+                    booking_request=booking_request,  # No delivery_request associated with BookRiderAssignment
                     rider_amount=rider_share,
                     commissioner_amount=commission_share,
                     boss_amount=boss_share
