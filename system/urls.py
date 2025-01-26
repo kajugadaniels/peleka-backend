@@ -36,6 +36,7 @@ urlpatterns = [
     path('book-rider/<int:pk>/', BookRiderDetailView.as_view(), name='bookRiderDetail'),
     path('book-rider/update/<int:pk>/', BookRiderUpdateView.as_view(), name='updateBookRider'),
     path('book-rider/delete/<int:pk>/', DeleteBookRiderView.as_view(), name='deleteBookRider'),
+    path('book-rider/<int:pk>/complete/', CompleteBookRiderView.as_view(), name='completeRiderBook'),
 
     path('book-rider-assignments/', BookRiderAssignmentListView.as_view(), name='bookRiderAssignmentList'),
     path('book-rider-assignment/', AddBookRiderAssignmentView.as_view(), name='addBookRiderAssignment'),
