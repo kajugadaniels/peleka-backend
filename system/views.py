@@ -981,6 +981,8 @@ class AddBookRiderAssignmentView(generics.CreateAPIView):
     API view to assign a rider to a BookRider request.
     - Accessible only to authenticated users with 'add_bookriderassignment' permission.
     - Automatically updates the BookRider status to "Confirmed" upon assignment.
+    - Dispatches the booking_price split (rider, commissioner, boss) into
+      the Transaction and TransactionHistory models.
     """
     queryset = BookRiderAssignment.objects.all().order_by('-assigned_at')
     serializer_class = BookRiderAssignmentSerializer
@@ -994,20 +996,126 @@ class AddBookRiderAssignmentView(generics.CreateAPIView):
         if not request.user.has_perm('system.add_bookriderassignment'):
             raise PermissionDenied({'message': "You do not have permission to assign riders to book rider requests."})
 
-        # Deserialize the incoming data
-        serializer = self.get_serializer(data=request.data)
-        
-        # Validate the data
-        serializer.is_valid(raise_exception=True)
-        
-        # Assign the rider and save the assignment
-        assignment = serializer.save()
-        
-        # Return a success response with the created assignment data
+        rider_id = request.data.get('rider_id')
+        book_rider_id = request.data.get('book_rider_id')
+
+        # Validate input
+        if not rider_id or not book_rider_id:
+            return Response(
+                {'message': "Both 'rider_id' and 'book_rider_id' are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Fetch the rider and book rider objects
+        try:
+            rider = Rider.objects.get(id=rider_id)
+        except Rider.DoesNotExist:
+            raise NotFound({'message': "Rider not found."})
+
+        try:
+            book_rider = BookRider.objects.get(id=book_rider_id)
+        except BookRider.DoesNotExist:
+            raise NotFound({'message': "BookRider request not found."})
+
+        # Check if the rider is available (no active, undelivered BookRiderAssignment)
+        if BookRiderAssignment.objects.filter(rider=rider, status__in=['Pending', 'Confirmed', 'In Progress']).exists():
+            return Response(
+                {'message': "This rider is not available at the moment."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Wrap the entire operation in an atomic transaction.
+        try:
+            with transaction.atomic():
+                # Assign the rider by creating a new BookRiderAssignment entry with status='Pending'
+                assignment = BookRiderAssignment.objects.create(
+                    book_rider=book_rider,
+                    rider=rider,
+                    status='Pending',
+                    assigned_at=timezone.now(),
+                    last_assigned_at=timezone.now()
+                )
+
+                # Update the BookRider status to "Confirmed"
+                book_rider.status = 'Confirmed'
+                book_rider.save()
+
+                # --- TRANSACTION DISPATCH LOGIC ---
+                # Convert booking_price into a Decimal; default to 0 if not set
+                try:
+                    if book_rider.booking_price:
+                        price = Decimal(str(book_rider.booking_price))
+                    else:
+                        price = Decimal('0.00')
+                except (InvalidOperation, TypeError) as conv_err:
+                    logger.error(f"Error converting booking_price '{book_rider.booking_price}' to Decimal: {conv_err}")
+                    price = Decimal('0.00')
+
+                logger.debug(f"Booking price converted to Decimal: {price}")
+
+                # Calculate shares based on whether a commissioner is assigned.
+                rider_share = (price * Decimal('0.90')).quantize(Decimal('0.01'))
+                commissioner_obj = rider.commissioner  # already a User instance (or None)
+                boss_obj = rider.boss                # already a User instance (or None)
+
+                if commissioner_obj:
+                    commission_share = (price * Decimal('0.03')).quantize(Decimal('0.01'))
+                    boss_share = (price * Decimal('0.07')).quantize(Decimal('0.01'))
+                else:
+                    commission_share = Decimal('0.00')
+                    boss_share = (price * Decimal('0.10')).quantize(Decimal('0.01'))
+
+                logger.debug(f"Calculated shares: rider_share={rider_share}, commission_share={commission_share}, boss_share={boss_share}")
+
+                # Retrieve associated User objects.
+                rider_user = rider.user
+                commissioner_user = commissioner_obj  if commissioner_obj else None  # Use directly
+                boss_user = boss_obj if boss_obj else None  # Use directly
+
+                # Get or create the Transaction record (wallet) for this combination
+                transaction_obj, created = Transaction.objects.get_or_create(
+                    rider=rider_user,
+                    commissioner=commissioner_user,
+                    boss=boss_user,
+                    defaults={
+                        'rider_total': Decimal('0.00'),
+                        'commissioner_total': Decimal('0.00'),
+                        'boss_total': Decimal('0.00')
+                    }
+                )
+                # Update wallet totals
+                transaction_obj.rider_total += rider_share
+                if commissioner_user:
+                    transaction_obj.commissioner_total += commission_share
+                    transaction_obj.boss_total += boss_share
+                else:
+                    transaction_obj.boss_total += boss_share
+                transaction_obj.save()
+                logger.debug(f"Transaction record updated: {transaction_obj}")
+
+                # Create a TransactionHistory record for this event
+                TransactionHistory.objects.create(
+                    transaction=transaction_obj,
+                    delivery_request=None,  # No delivery_request associated with BookRiderAssignment
+                    rider_amount=rider_share,
+                    commissioner_amount=commission_share,
+                    boss_amount=boss_share
+                )
+                logger.debug("TransactionHistory record created successfully.")
+
+        except Exception as e:
+            logger.error(f"Error dispatching transaction amounts: {e}", exc_info=True)
+            return Response(
+                {'message': "An error occurred while assigning the rider. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # Serialize and return the created BookRiderAssignment
+        serializer = self.get_serializer(assignment)
         return Response(
             {
-                'message': 'Rider assigned to book rider request successfully.',
-                'data': BookRiderAssignmentSerializer(assignment, context={'request': request}).data
+                'message': "Rider assigned to BookRider request successfully.",
+                'book_rider_assignment': serializer.data
             },
             status=status.HTTP_201_CREATED
         )
