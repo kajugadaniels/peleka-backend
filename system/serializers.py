@@ -393,7 +393,7 @@ class BookRiderAssignmentSerializer(serializers.ModelSerializer):
         model = BookRiderAssignment
         fields = [
             'id', 'book_rider', 'client_name', 'client_phone', 'rider', 'rider_name', 'rider_phone_number',
-            'assigned_at', 'in_progress_at', 'completed_at', 'cancelled_at', 'status',
+            'assigned_at', 'in_progress_at', 'completed_at', 'cancelled_at', 'status', 'delivered',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
@@ -410,13 +410,13 @@ class BookRiderAssignmentSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """
         Assign a rider to a BookRider request.
-        Automatically sets the assigned_at timestamp and updates the BookRider status to 'Confirmed'.
+        Automatically sets the assigned_at timestamp and updates the BookRider status to 'Accepted'.
         """
         rider = validated_data.get('rider')
         book_rider = validated_data.get('book_rider')
         
         # Check if the rider is available (no active assignments)
-        if BookRiderAssignment.objects.filter(rider=rider, status__in=['Pending', 'Confirmed', 'In Progress']).exists():
+        if BookRiderAssignment.objects.filter(rider=rider, status__in=['Pending', 'Accepted', 'In Progress']).exists():
             raise serializers.ValidationError("This rider is currently unavailable for a new assignment.")
         
         # Create the assignment
@@ -424,11 +424,11 @@ class BookRiderAssignmentSerializer(serializers.ModelSerializer):
             book_rider=book_rider,
             rider=rider,
             assigned_at=timezone.now(),
-            status='Confirmed'
+            status='Accepted'
         )
         
         # Update the BookRider status
-        book_rider.status = 'Confirmed'
+        book_rider.status = 'Accepted'
         book_rider.save()
         
         return assignment
@@ -444,7 +444,7 @@ class BookRiderAssignmentSerializer(serializers.ModelSerializer):
         if 'rider' in validated_data:
             new_rider = validated_data.pop('rider')
             # Check if the new rider is available
-            if BookRiderAssignment.objects.filter(rider=new_rider, status__in=['Pending', 'Confirmed', 'In Progress']).exists():
+            if BookRiderAssignment.objects.filter(rider=new_rider, status__in=['Pending', 'Accepted', 'In Progress']).exists():
                 raise serializers.ValidationError("The new rider is currently unavailable for assignment.")
             instance.rider = new_rider
             instance.assigned_at = timezone.now()
@@ -467,38 +467,18 @@ class BookRiderAssignmentSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
-class BookRiderAssignmentCompleteSerializer(serializers.ModelSerializer):
+class BookRiderCompleteSerializer(serializers.ModelSerializer):
     """
-    Serializer for marking a BookRiderAssignment as Completed.
-    Only allows the status to be set to 'Completed' and prevents completion if cancelled.
+    Serializer for marking a BookRider as Completed.
+    Only allows the status to be set to 'Completed'.
     """
-    
+
     class Meta:
-        model = BookRiderAssignment
+        model = BookRider
         fields = ['status']
-    
+        read_only_fields = ['status']
+
     def validate(self, attrs):
         if attrs.get('status') != 'Completed':
             raise serializers.ValidationError("Status can only be updated to 'Completed'.")
-        # Check if the current status is 'Cancelled'
-        if self.instance.status == 'Cancelled':
-            raise serializers.ValidationError("Cannot complete a cancelled booking.")
-        # Ensure current status is 'In Progress'
-        if self.instance.status != 'In Progress':
-            raise serializers.ValidationError("Only assignments with status 'In Progress' can be marked as 'Completed'.")
         return attrs
-
-    def update(self, instance, validated_data):
-        """
-        Update the status of the BookRiderAssignment to 'Completed' and set the completed_at timestamp.
-        """
-        instance.status = 'Completed'
-        instance.completed_at = timezone.now()
-        instance.save()
-
-        # Update the related BookRider status
-        book_rider = instance.book_rider
-        book_rider.status = 'Completed'
-        book_rider.save()
-
-        return instance

@@ -786,7 +786,7 @@ class BookRiderListView(generics.ListAPIView):
         if user.has_perm('web.view_bookrider'):
             return BookRider.objects.filter(
                 delete_status=False,
-                status__in=['Pending', 'Confirmed']
+                status__in=['Pending', 'Accepted']
             ).order_by('-created_at')
 
         # If the user does not have the required permission, return an empty queryset
@@ -945,6 +945,54 @@ class DeleteBookRiderView(generics.DestroyAPIView):
             'data': BookRiderSerializer(book_rider).data
         }, status=status.HTTP_200_OK)
 
+class CompleteBookRiderView(generics.UpdateAPIView):
+    """
+     API view to mark a BookRider as Completed.
+    - Accessible to any authenticated user.
+    - Only updates the status to 'Completed'.
+    - If the assignment is 'Cancelled' or not 'In Progress', returns an error.
+    - Also updates related BookRider status to 'Completed'.
+    """
+    queryset = BookRider.objects.all()
+    serializer_class = BookRiderCompleteSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def patch(self, request, *args, **kwargs):
+        book_rider = self.get_object()
+
+        if book_rider.status == 'Completed':
+            return Response(
+                {'message': 'The rider booking request is already completed.'},
+                status=status.HTTP_200_OK
+            )
+
+        # Set status to 'Completed'
+        book_rider.status = 'Completed'
+        book_rider.save()
+
+        # Update related BookRiderAssignment records
+        rider_assignment = BookRiderAssignment.objects.filter(
+            book_rider=book_rider,
+            delivered=False
+        )
+        updated_count = rider_assignment.update(
+            delivered=True,
+            status="Completed",
+            completed_at=timezone.now()
+        )
+
+        # Serialize the updated delivery request
+        serializer = BookRiderSerializer(book_rider)
+
+        return Response(
+            {
+                'message': 'Rider booking request marked as completed successfully.',
+                'data': serializer.data,
+                'rider_assignment_updated': updated_count
+            },
+            status=status.HTTP_200_OK
+        )
+
 class BookRiderAssignmentListView(generics.ListAPIView):
     """
     API view to list all Book Rider Assignments.
@@ -978,36 +1026,132 @@ class BookRiderAssignmentListView(generics.ListAPIView):
 
 class AddBookRiderAssignmentView(generics.CreateAPIView):
     """
-    API view to assign a rider to a BookRider request.
-    - Accessible only to authenticated users with 'add_bookriderassignment' permission.
-    - Automatically updates the BookRider status to "Confirmed" upon assignment.
+    API view to assign a rider to a booking rider.
+    - Accessible only to authenticated users with appropriate permissions.
+    - Updates the booking rider status to "Accepted" upon assignment.
+    - Dispatches the booking_price split (rider, commissioner, boss) into
+      the Transaction and TransactionHistory models.
     """
-    queryset = BookRiderAssignment.objects.all().order_by('-assigned_at')
+    queryset = BookRiderAssignment.objects.all().order_by('-id')
     serializer_class = BookRiderAssignmentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        """
-        Handle the creation of a new book rider assignment.
-        """
-        # Check if the user has permission to add a book rider assignment
-        if not request.user.has_perm('system.add_bookriderassignment'):
-            raise PermissionDenied({'message': "You do not have permission to assign riders to book rider requests."})
+        rider_id = request.data.get('rider_id')
+        book_rider_id = request.data.get('book_rider_id')
 
-        # Deserialize the incoming data
-        serializer = self.get_serializer(data=request.data)
-        
-        # Validate the data
-        serializer.is_valid(raise_exception=True)
-        
-        # Assign the rider and save the assignment
-        assignment = serializer.save()
-        
-        # Return a success response with the created assignment data
+        # Validate input
+        if not rider_id or not book_rider_id:
+            return Response(
+                {'message': "Both 'rider_id' and 'book_rider_id' are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Fetch the rider and booking rider objects
+        try:
+            rider = Rider.objects.get(id=rider_id)
+        except Rider.DoesNotExist:
+            raise NotFound({'message': "Rider not found."})
+        try:
+            book_rider = BookRider.objects.get(id=book_rider_id)
+        except BookRider.DoesNotExist:
+            raise NotFound({'message': "booking rider not found."})
+
+        # Check if the rider is available (no active, undelivered BookRiderAssignment)
+        if BookRiderAssignment.objects.filter(rider=rider, delivered=False).exists():
+            return Response(
+                {'message': "This rider is not available at the moment."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Wrap the entire operation in an atomic transaction.
+        try:
+            with transaction.atomic():
+                # Create the BookRiderAssignment entry
+                rider_booking = BookRiderAssignment.objects.create(
+                    rider=rider,
+                    book_rider=book_rider,
+                    delivered=False,
+                    assigned_at=timezone.now(),
+                )
+
+                # Update the booking rider's status to "Accepted"
+                book_rider.status = 'Accepted'
+                book_rider.save()
+
+                # --- TRANSACTION DISPATCH LOGIC ---
+                # Convert booking_price into a Decimal; default to 0 if not set
+                try:
+                    if book_rider.booking_price:
+                        price = Decimal(str(book_rider.booking_price))
+                    else:
+                        price = Decimal('0.00')
+                except (InvalidOperation, TypeError) as conv_err:
+                    logger.error(f"Error converting booking_price '{book_rider.booking_price}' to Decimal: {conv_err}")
+                    price = Decimal('0.00')
+
+                logger.debug(f"Booking price converted to Decimal: {price}")
+
+                # Calculate shares based on whether a commissioner is assigned.
+                rider_share = (price * Decimal('0.90')).quantize(Decimal('0.01'))
+                commissioner_obj = rider.commissioner  # already a User instance (or None)
+                boss_obj = rider.boss                # already a User instance (or None)
+
+                if commissioner_obj:
+                    commission_share = (price * Decimal('0.03')).quantize(Decimal('0.01'))
+                    boss_share = (price * Decimal('0.07')).quantize(Decimal('0.01'))
+                else:
+                    commission_share = Decimal('0.00')
+                    boss_share = (price * Decimal('0.10')).quantize(Decimal('0.01'))
+
+                logger.debug(f"Calculated shares: rider_share={rider_share}, commission_share={commission_share}, boss_share={boss_share}")
+
+                # Retrieve associated User objects.
+                # rider.user is the associated user from the Rider model.
+                rider_user = rider.user
+                commissioner_user = commissioner_obj  if commissioner_obj else None  # Use directly
+                boss_user = boss_obj if boss_obj else None  # Use directly
+
+                # Get or create the Transaction record (wallet) for this combination
+                transaction_obj, created = Transaction.objects.get_or_create(
+                    rider=rider_user,
+                    commissioner=commissioner_user,
+                    boss=boss_user,
+                    defaults={
+                        'rider_total': Decimal('0.00'),
+                        'commissioner_total': Decimal('0.00'),
+                        'boss_total': Decimal('0.00')
+                    }
+                )
+                # Update wallet totals
+                transaction_obj.rider_total += rider_share
+                if commissioner_user:
+                    transaction_obj.commissioner_total += commission_share
+                    transaction_obj.boss_total += boss_share
+                else:
+                    transaction_obj.boss_total += boss_share
+                transaction_obj.save()
+                logger.debug(f"Transaction record updated: {transaction_obj}")
+
+                # Create a TransactionHistory record for this event
+                TransactionHistory.objects.create(
+                    transaction=transaction_obj,
+                    book_rider=book_rider,
+                    rider_amount=rider_share,
+                    commissioner_amount=commission_share,
+                    boss_amount=boss_share
+                )
+                logger.debug("TransactionHistory record created successfully.")
+        except Exception as e:
+            logger.error(f"Error dispatching transaction amounts: {e}", exc_info=True)
+            raise e
+
+        # Serialize and return the created BookRiderAssignment
+        serializer = self.get_serializer(rider_booking)
         return Response(
             {
-                'message': 'Rider assigned to book rider request successfully.',
-                'data': BookRiderAssignmentSerializer(assignment, context={'request': request}).data
+                'message': "Rider assigned to booking rider successfully.",
+                'rider_booking': serializer.data
             },
             status=status.HTTP_201_CREATED
         )
@@ -1130,50 +1274,3 @@ class DeleteBookRiderAssignmentView(generics.DestroyAPIView):
             'message': "Book rider assignment cancelled successfully.",
             'data': BookRiderAssignmentSerializer(assignment).data
         }, status=status.HTTP_200_OK)
-
-class CompleteBookRiderAssignmentView(generics.UpdateAPIView):
-    """
-    API view to mark a BookRiderAssignment as Completed.
-    - Accessible to any authenticated user.
-    - Only updates the status to 'Completed'.
-    - If the assignment is 'Cancelled' or not 'In Progress', returns an error.
-    - Also updates related BookRider status to 'Completed'.
-    """
-    queryset = BookRiderAssignment.objects.all()
-    serializer_class = BookRiderAssignmentCompleteSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def patch(self, request, *args, **kwargs):
-        """
-        Handle PATCH requests to mark the assignment as completed.
-        """
-        assignment = self.get_object()
-
-        if assignment.status == 'Completed':
-            return Response(
-                {'message': 'The book rider assignment is already completed.'},
-                status=status.HTTP_200_OK
-            )
-        
-        # Serialize the incoming data to set status to 'Completed'
-        serializer = self.get_serializer(assignment, data={'status': 'Completed'}, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-
-        return Response(
-            {
-                'message': 'Book rider assignment marked as completed successfully.',
-                'data': BookRiderAssignmentSerializer(assignment, context={'request': request}).data
-            },
-            status=status.HTTP_200_OK
-        )
-
-    def get_object(self):
-        """
-        Retrieve and return the BookRiderAssignment instance by ID.
-        - Ensure the assignment is not deleted.
-        """
-        try:
-            return BookRiderAssignment.objects.get(pk=self.kwargs['pk'], book_rider__delete_status=False)
-        except BookRiderAssignment.DoesNotExist:
-            raise NotFound({'message': "Book rider assignment not found."})

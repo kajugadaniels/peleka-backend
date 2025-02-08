@@ -35,11 +35,31 @@ class TransactionHistory(models.Model):
         on_delete=models.CASCADE,
         related_name='histories'
     )
-    delivery_request = models.ForeignKey(DeliveryRequest, on_delete=models.CASCADE)
+    delivery_request = models.ForeignKey(
+        DeliveryRequest,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='transaction_histories',
+        help_text='Associated Delivery Request (if any)'
+    )
+    book_rider = models.ForeignKey(
+        BookRider,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='transaction_histories',
+        help_text='Associated BookRider (if any)'
+    )
     rider_amount = models.DecimalField(max_digits=10, decimal_places=2)
     commissioner_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     boss_amount = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"History for Transaction {self.transaction.id} (DeliveryRequest {self.delivery_request.id})"
+        if self.delivery_request:
+            return f"History for Transaction {self.transaction.id} (DeliveryRequest {self.delivery_request.id})"
+        elif self.book_rider:
+            return f"History for Transaction {self.transaction.id} (BookRider {self.book_rider.id})"
+        else:
+            return f"History for Transaction {self.transaction.id}"
